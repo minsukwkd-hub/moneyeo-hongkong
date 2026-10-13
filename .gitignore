@@ -1,9 +1,11 @@
-index.backup-*.html
+**/.omc/
 *.bak
 .DS_Store
-Thumbs.db
-.omc/
 .claude/
-모녀 홍콩 3박4일.md
-node_modules/
+.omc/
 .wrangler/
+Thumbs.db
+archive/
+index.backup-*.html
+node_modules/
+모녀 홍콩 3박4일.md
