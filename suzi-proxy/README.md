@@ -17,7 +17,7 @@ API 키를 HTML에 넣으면 받는 사람 모두에게 키가 노출되므로, 
 3. Worker → Settings → Variables and Secrets:
    - `ANTHROPIC_API_KEY` = 1번에서 받은 키 (**Secret**으로)
    - `SUZI_TOKEN` = 아무 긴 문자열, 예: `moneyeo-hk-2026-xyz` (**Secret**으로). 이 토큰을 모르는 사람은 서버를 못 씁니다.
-   - `ALLOWED_ORIGIN` = 페이지를 올린 주소, 예: `https://zefoe.github.io` (**Text**). GitHub Pages는 공개 사이트라 토큰이 보일 수 있는데, 이 설정을 하면 그 사이트에서 연 페이지의 요청만 받습니다.
+   - `ALLOWED_ORIGIN` = `https://minsukwkd-hub.github.io` (**Text**, 이 페이지의 GitHub Pages 주소). GitHub Pages는 공개 사이트라 토큰이 보일 수 있는데, 이 설정을 하면 그 사이트에서 연 페이지의 요청만 받습니다.
 4. 주소를 복사해 둡니다. 예: `https://suzi-proxy.<계정>.workers.dev`
 
 (명령줄이 편하면 `npm i -g wrangler` → `wrangler login` → 이 폴더에서 `wrangler deploy` → `wrangler secret put ANTHROPIC_API_KEY`, `wrangler secret put SUZI_TOKEN`)
@@ -29,7 +29,7 @@ API 키를 HTML에 넣으면 받는 사람 모두에게 키가 노출되므로, 
 ## 4. 아이폰에서 여는 법
 `.html` 파일을 카톡·에어드롭으로 보내면 iOS가 "미리보기"로 열어 지도·SUZI가 동작하지 않을 수 있습니다.
 **파일을 어딘가에 올려 두고 주소로 여는 것**이 가장 확실합니다. 예:
-- Cloudflare Pages / GitHub Pages / Netlify에 `index.html` 하나 업로드 (무료) → 받은 주소를 Safari에서 열고 "홈 화면에 추가"
+- 이 페이지는 이미 GitHub Pages에 있어요: https://minsukwkd-hub.github.io/moneyeo-hongkong/ → Safari에서 열고 공유 버튼 → "홈 화면에 추가"
 - 또는 claude.ai 아티팩트로 게시한 링크 (이 경우 SUZI는 보는 사람의 claude.ai 계정으로 동작, 프록시 불필요)
 
 ## 비용·안전 메모

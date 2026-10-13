@@ -6,4 +6,6 @@
 - 장소별 설명·영업시간·요금·지도(정보 기준일 표시)
 - SUZI 여행 도우미: claude.ai 아티팩트 안에서는 자동 연결, 밖에서는 `suzi-proxy/` 서버로 연결
 
-배포: `main` 브랜치 루트를 GitHub Pages로 게시 (`deploy.ps1` 참고).
+배포 주소: https://minsukwkd-hub.github.io/moneyeo-hongkong/
+
+배포: `main` 브랜치 루트를 GitHub Pages로 게시. `index.html`을 고쳐 `git push`하면 1~2분 뒤 자동 반영됩니다.
