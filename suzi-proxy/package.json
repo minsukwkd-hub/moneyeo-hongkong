@@ -1,0 +1,16 @@
+{
+  "name": "suzi-proxy",
+  "version": "1.0.0",
+  "description": "공유용 `index.html`이 아이폰 Safari 등 **claude.ai 밖에서도 SUZI를 쓰려면** Claude API를 대신 불러 주는 작은 서버가 하나 필요합니다. API 키를 HTML에 넣으면 받는 사람 모두에게 키가 노출되므로, 키는 이 서버에만 두고 HTML은 서버 주소만 알고 있게 합니다.",
+  "main": "worker.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "wrangler": "^4.150.0"
+  }
+}

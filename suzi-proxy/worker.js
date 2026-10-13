@@ -36,6 +36,15 @@ export default {
     }
     if (!env.ANTHROPIC_API_KEY) return json({ error: { message: "ANTHROPIC_API_KEY not set" } }, 500);
 
+    // 1.5) IP당 호출 제한 (wrangler.toml의 [[ratelimits]] 바인딩이 있을 때만)
+    if (env.SUZI_RL) {
+      const ip = req.headers.get("cf-connecting-ip") || "unknown";
+      try {
+        const { success } = await env.SUZI_RL.limit({ key: ip });
+        if (!success) return json({ error: { message: "rate limited" } }, 429);
+      } catch (e) { /* 바인딩 오류 시 통과 */ }
+    }
+
     // 2) 요청 본문 검사 (모델 허용 목록, 크기 제한)
     let body;
     try { body = await req.json(); } catch { return json({ error: { message: "invalid JSON" } }, 400); }
