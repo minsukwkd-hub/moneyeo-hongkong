@@ -1,7 +1,0 @@
-{
-  "tool_name": "mcp__Claude_Browser__browser_batch",
-  "tool_input_preview": "{\"actions\":[{\"name\":\"javascript_tool\",\"input\":{\"tabId\":\"tab-3\",\"action\":\"javascript_exec\",\"text\":\"await connect(); openSheet(); connOpen=true; renderConnBar(); 'open'\"}},{\"name\":\"computer\",\"input\":{\"t...",
-  "error": "[javascript_tool:javascript_exec] \"open\"\n\n\nTab Context:\n- Executed on tabId: tab-3\n- Available tabs:\n  • tabId tab-3: \"모녀 홍콩 3박4일\" (\"http://localhost:8765/index.html\")\n\nactions[1] (computer:screenshot) failed: screenshot failed: Screenshot timed out after 5s: the page did not finish rendering in time. Retry; the pane does not need to be displayed. Claude's window may be behind another window, which can stop the page from drawing; if this repeats, continue with `get_page_text` or `find`, or ask t...",
-  "timestamp": "2026-10-13T12:54:53.802Z",
-  "retry_count": 1
-}
