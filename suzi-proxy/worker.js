@@ -7,6 +7,8 @@
 //   ANTHROPIC_API_KEY  (Secret, 필수)  console.anthropic.com 에서 발급한 키
 //   SUZI_TOKEN         (Secret, 권장)  아무 긴 문자열. index.html 연결 설정의 "서버 토큰"과 같아야 한다.
 //   ALLOWED_MODELS     (Text,  선택)  쉼표 구분. 기본 "claude-opus-5-5,claude-sonnet-5-5,claude-haiku-5-5"
+//   ALLOWED_ORIGIN     (Text,  권장)  페이지를 올린 주소의 origin. 예 "https://zefoe.github.io"
+//                                     설정하면 그 사이트에서 열린 페이지의 요청만 받는다(토큰이 노출돼도 다른 사이트에서 못 씀).
 
 const API = "https://api.anthropic.com/v1/messages";
 const CORS = {
@@ -21,6 +23,12 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     if (req.method !== "POST") return json({ error: { message: "POST only" } }, 405);
 
+    // 0) 출처(Origin) 확인 (ALLOWED_ORIGIN을 설정했을 때만)
+    if (env.ALLOWED_ORIGIN) {
+      const origin = req.headers.get("origin") || "";
+      const ok = env.ALLOWED_ORIGIN.split(",").map(s => s.trim()).includes(origin);
+      if (!ok) return json({ error: { message: "origin not allowed" } }, 403);
+    }
     // 1) 토큰 확인 (SUZI_TOKEN을 설정했을 때만)
     if (env.SUZI_TOKEN) {
       const auth = req.headers.get("authorization") || "";

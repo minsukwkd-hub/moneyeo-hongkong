@@ -17,6 +17,7 @@ API 키를 HTML에 넣으면 받는 사람 모두에게 키가 노출되므로, 
 3. Worker → Settings → Variables and Secrets:
    - `ANTHROPIC_API_KEY` = 1번에서 받은 키 (**Secret**으로)
    - `SUZI_TOKEN` = 아무 긴 문자열, 예: `moneyeo-hk-2026-xyz` (**Secret**으로). 이 토큰을 모르는 사람은 서버를 못 씁니다.
+   - `ALLOWED_ORIGIN` = 페이지를 올린 주소, 예: `https://zefoe.github.io` (**Text**). GitHub Pages는 공개 사이트라 토큰이 보일 수 있는데, 이 설정을 하면 그 사이트에서 연 페이지의 요청만 받습니다.
 4. 주소를 복사해 둡니다. 예: `https://suzi-proxy.<계정>.workers.dev`
 
 (명령줄이 편하면 `npm i -g wrangler` → `wrangler login` → 이 폴더에서 `wrangler deploy` → `wrangler secret put ANTHROPIC_API_KEY`, `wrangler secret put SUZI_TOKEN`)
