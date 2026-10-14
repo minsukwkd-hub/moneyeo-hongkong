@@ -1264,16 +1264,58 @@ const VKEY="suzi-hk-variant";
 const storeKey=id=>"suzi-hk-plan-v2:"+id;
 const metaOf=id=>PLANS.find(p=>p.id===id);
 let variant=(()=>{ try{ const v=localStorage.getItem(VKEY); return metaOf(v)?v:"A"; }catch(e){ return "A"; } })();
-function loadPlan(id){
-  let p=null;
-  try{ const s=localStorage.getItem(storeKey(id)) || (id==="A"?localStorage.getItem(STORE):null); p=s?JSON.parse(s):null; }catch(e){ p=null; }
-  if(!p||!Array.isArray(p.days)) p=structuredClone(metaOf(id).data);
+
+// ---- 데이터 모델 v3 (docs/설계.md 2장) ----
+// 문서 하나 = 여행(trip + days[]). 날·장소에 id, 장소에 origin(template|me|suzi), trip.dates는 {label,start?,end?},
+// trip.flights는 {in:{code},out:{code}}. render는 데이터에 쓰지 않는다(옛 it.i는 읽을 때 지운다).
+const DOC_V=3;
+function newId(){ const a=new Uint8Array(8); crypto.getRandomValues(a); return Array.from(a,b=>(b%36).toString(36)).join(''); }
+function normalizeDoc(p){
+  if(!p||typeof p!=="object") p={};
+  if(!Array.isArray(p.days)) p.days=[];
+  p.v=DOC_V;
+  const t=p.trip=(p.trip&&typeof p.trip==="object")?p.trip:{};
+  if(t.dates==null||typeof t.dates==="string") t.dates={label:t.dates||""};
+  if(!t.flights||typeof t.flights!=="object"){ t.flights={in:t.flightIn?{code:String(t.flightIn)}:null,out:t.flightOut?{code:String(t.flightOut)}:null}; }
+  delete t.flightIn; delete t.flightOut;
+  if(!t.party||typeof t.party!=="object") t.party={type:"모녀"};
+  if(!Array.isArray(t.lodging)) t.lodging=[];
+  p.days.forEach(d=>{
+    if(!d||typeof d!=="object") return;
+    if(!d.id) d.id=newId();
+    if(!Array.isArray(d.items)) d.items=[];
+    if(!Array.isArray(d.bridges)) d.bridges=[];
+    if(!Array.isArray(d.expenses)) d.expenses=[];
+    d.items.forEach(it=>{
+      if(!it||typeof it!=="object") return;
+      if(!it.id) it.id=newId();
+      if(!it.origin) it.origin = it.added ? (it.by==='me'?'me':'suzi') : 'template';
+      delete it.i; delete it.added; delete it.by;
+    });
+  });
+  if(!p.createdAt) p.createdAt=Date.now();
   return p;
 }
+// 저장소 래퍼: 새 키 tokki-trip:<id>에 쓰고, 없으면 옛 키(suzi-hk-plan-v2:<id>, v1)에서 읽어 올린다. 옛 키는 지우지 않는다(백업).
+const TRIP_KEY=id=>"tokki-trip:"+id;
+const repo={
+  load(id){
+    let p=null;
+    try{ const s=localStorage.getItem(TRIP_KEY(id)); p=s?JSON.parse(s):null; }catch(e){ p=null; }
+    if(!p){ try{ const s=localStorage.getItem(storeKey(id)) || (id==="A"?localStorage.getItem(STORE):null); p=s?JSON.parse(s):null; }catch(e){ p=null; } }
+    if(!p||!Array.isArray(p.days)) p=structuredClone(metaOf(id).data);
+    return normalizeDoc(p);
+  },
+  save(id,p){ p.updatedAt=Date.now(); try{ localStorage.setItem(TRIP_KEY(id), JSON.stringify(p)); }catch(e){} },
+  fresh(id){ return normalizeDoc(structuredClone(metaOf(id).data)); }
+};
+function loadPlan(id){ return repo.load(id); }
 let plan=loadPlan(variant), history=[];
 function currentMeta(){ return metaOf(variant); }
 function currentDefault(){ return currentMeta().data; }
-function save(){ try{ localStorage.setItem(storeKey(variant), JSON.stringify(plan)); localStorage.setItem(VKEY, variant); }catch(e){} }
+function save(){ repo.save(variant,plan); try{ localStorage.setItem(VKEY, variant); }catch(e){} if(typeof SETTINGS!=="undefined"){ SETTINGS.last={type:"trip",id:variant}; saveSettings(); } }
+function stopById(id){ for(const d of plan.days){ const k=d.items.findIndex(x=>x.id===id); if(k>=0) return {d,k,it:d.items[k]}; } return null; }
+function daySummary(d){ return d.items.map(it=>({id:it.id,t:it.t,n:it.n})); }
 function switchPlan(id){ if(!metaOf(id)) return; if(id!==variant){ variant=id; plan=loadPlan(id); history=[]; document.getElementById('undo').disabled=true; } save(); render(); }
 function sortDay(d){ d.items.sort((a,b)=>String(a.t).localeCompare(String(b.t))); }
 function isMacauPt(p){ return isFinite(p.lng)&&p.lng<113.75; }
@@ -1365,7 +1407,7 @@ function render(){
   const t=plan.trip||{};
   let macauDay=t.macau||"미정";
   if(custom){ const mi=plan.days.findIndex(d=>d.items.some(isMacauPt)); macauDay = mi>=0 ? "Day "+(mi+1) : "미정"; }
-  const st=[["여행 날짜",t.dates||"미정"],["숙소","셩완 · 3박 고정"],["항공편",[t.flightIn,t.flightOut].filter(Boolean).join(" / ")||"미정"],["마카오 가는 날",macauDay]];
+  const fl=t.flights||{}; const st=[["여행 날짜",(t.dates&&t.dates.label)||"미정"],["숙소","셩완 · 3박 고정"],["항공편",[fl.in&&fl.in.code,fl.out&&fl.out.code].filter(Boolean).join(" / ")||"미정"],["마카오 가는 날",macauDay]];
   document.getElementById('status').innerHTML=st.map(([k,v])=>`<div class="stat ${/미정|임시/.test(v)?'todo':''}"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('');
   document.getElementById('picker').innerHTML=PLANS.map(p=>`<button type="button" class="pick${p.id===variant?' on':''}" data-id="${p.id}" aria-pressed="${p.id===variant}"><span class="o">${esc(p.ord)}</span><span class="n">${esc(p.name)}</span></button>`).join('');
   document.getElementById('pickdesc').innerHTML=esc(P.desc)+(custom?'':' <button class="linkbtn" type="button" id="copyToMine">이 여정을 바탕으로 직접 꾸미기 →</button>');
@@ -1384,17 +1426,17 @@ function render(){
       +`<div class="mapbox"><div class="map"></div><button class="expand" type="button" data-big="d${di+1}" data-title="Day ${di+1} 지도">크게 보기</button></div><ol class="tl"></ol>`;
     const ol=sec.querySelector('ol');
     d.items.forEach((it,ii)=>{
-      it.i=ii+1;
+      const added=it.origin==='me'||it.origin==='suzi';
       const li=document.createElement('li');
-      li.className=(it.key?'hl ':'')+(it.added?'new ':'')+(custom?'ed':'');
+      li.className=(it.key?'hl ':'')+(added?'new ':'')+(custom?'ed':'');
       li.dataset.day=di; li.dataset.idx=ii;
-      const tag=it.added?`<span class="tag">${it.by==='me'?'직접 추가':'토끼 추가'}</span>`:'';
+      const tag=added?`<span class="tag">${it.origin==='me'?'직접 추가':'토끼 추가'}</span>`:'';
       const tcell=custom?`<div class="t"><input type="time" class="tin" value="${esc(it.t||'')}" aria-label="시간"></div>`:`<div class="t">${esc(it.t||'')}</div>`;
       li.innerHTML=`${tcell}<div class="c"><div class="name"><span class="pn">${ii+1}</span><button class="nm" type="button" aria-label="${esc(it.n)} 정보 보기">${esc(it.n)}${tag}</button></div><p class="why">${esc(it.why||'')}</p>${it.note?`<p class="note">${esc(it.note)}</p>`:''}<div class="act"><a class="gm" href="${gm(it.q||it.n)}" target="_blank" rel="noopener">구글 지도에서 열기 ↗</a>${custom?'<button class="rm" type="button">빼기</button>':''}</div></div>`;
       ol.appendChild(li);
     });
     host.appendChild(sec);
-    let pins=clusterPins(d.items.filter(x=>!x.hotel));
+    let pins=clusterPins(d.items.map((x,k)=>({...x,i:k+1})).filter(x=>!x.hotel));
     const hk=pins.length&&pins[0].lng>113.8;
     if(hk) pins.push({...HOTEL,hotel:true,t:"3박 고정",why:"마카오 페리터미널(신덕센터) 바로 옆이에요."});
     const mapEl=sec.querySelector('.map');
@@ -1421,17 +1463,17 @@ function render(){
 render();
 
 // ---- undo / reset ----
-document.getElementById('undo').onclick=()=>{ if(!history.length) return; plan=JSON.parse(history.pop()); save(); render(); document.getElementById('undo').disabled=!history.length; };
+document.getElementById('undo').onclick=()=>{ if(!history.length) return; plan=normalizeDoc(JSON.parse(history.pop())); save(); render(); document.getElementById('undo').disabled=!history.length; };
 document.getElementById('reset').onclick=()=>{ document.getElementById('resetConfirm').hidden=false; };
 document.getElementById('resetNo').onclick=()=>{ document.getElementById('resetConfirm').hidden=true; };
-document.getElementById('resetYes').onclick=()=>{ snapshot(); INFO_EDIT={}; saveInfoEdit(); plan=structuredClone(currentDefault()); save(); render(); document.getElementById('resetConfirm').hidden=true; };
+document.getElementById('resetYes').onclick=()=>{ snapshot(); INFO_EDIT={}; saveInfoEdit(); plan=repo.fresh(variant); save(); render(); document.getElementById('resetConfirm').hidden=true; };
 
 // ---- 여정 고르기 ----
 document.getElementById('picker').onclick=e=>{ const b=e.target.closest('.pick'); if(b) switchPlan(b.dataset.id); };
 document.getElementById('pickdesc').addEventListener('click',e=>{
   const b=e.target.closest('#copyToMine'); if(!b) return;
   const cur=loadPlan('U'), filled=cur.days.reduce((n,d)=>n+d.items.filter(x=>!x.hotel).length,0);
-  const doCopy=()=>{ const copy=structuredClone(plan); copy.days.forEach(d=>{ delete d.key; delete d.sub; delete d.macau; }); try{ localStorage.setItem(storeKey('U'), JSON.stringify(copy)); }catch(err){} switchPlan('U'); document.getElementById('d1').scrollIntoView({behavior:'smooth',block:'start'}); };
+  const doCopy=()=>{ const copy=structuredClone(plan); copy.days.forEach(d=>{ delete d.key; delete d.sub; delete d.macau; delete d.id; d.items.forEach(it=>{ delete it.id; }); }); copy.templateId=variant; delete copy.createdAt; repo.save('U', normalizeDoc(copy)); switchPlan('U'); document.getElementById('d1').scrollIntoView({behavior:'smooth',block:'start'}); };
   if(filled<=4){ doCopy(); return; }
   if(b.dataset.arm){ doCopy(); return; }
   b.dataset.arm='1'; b.classList.add('warn'); b.textContent='지금 "당신의 여정"을 덮어쓰게 돼요. 한 번 더 누르면 복사해요';
@@ -1462,7 +1504,7 @@ document.getElementById('addGo').onclick=()=>{
   const di=dayIdx(document.getElementById('addDay').value), d=plan.days[di];
   const tm=document.getElementById('addTime').value||"10:00";
   snapshot();
-  d.items.push({t:tm,n:addSel.n,q:addSel.q,lat:addSel.lat,lng:addSel.lng,why:addSel.why,note:addSel.note,key:document.getElementById('addKey').checked,added:true,by:"me"});
+  d.items.push({id:newId(),t:tm,n:addSel.n,q:addSel.q,lat:addSel.lat,lng:addSel.lng,why:addSel.why,note:addSel.note,key:document.getElementById('addKey').checked,origin:"me"});
   sortDay(d); save(); render(); closeAdd();
   const sec=document.getElementById('d'+(di+1)); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'});
 };
@@ -1500,7 +1542,7 @@ function openInfo(it){
   document.getElementById('infoBody').innerHTML=html;
   infosheet.hidden=false; scrim.hidden=false; fab.hidden=true;
   const el=document.getElementById('infomap');
-  if(isFinite(it.lat)&&isFinite(it.lng)){ try{ mount('info',el,{pins:[{...it,i:it.i||1,hotel:hotel}]}); setTimeout(()=>LIVE.info&&LIVE.info.invalidateSize(),60); }catch(e){ el.hidden=true; } }
+  if(isFinite(it.lat)&&isFinite(it.lng)){ try{ const pos=stopById(it.id); mount('info',el,{pins:[{...it,i:pos?pos.k+1:1,hotel:hotel}]}); setTimeout(()=>LIVE.info&&LIVE.info.invalidateSize(),60); }catch(e){ el.hidden=true; } }
   else el.hidden=true;
   const ah=document.getElementById('askHotel'); if(ah) ah.onclick=()=>{ closeInfo(); openSheet(); ask(CHIPS[0][1]); };
   const af=document.getElementById('askFerry'); if(af) af.onclick=()=>{ closeInfo(); openSheet(); ask(`${it.n} 페리 운항 시간표, 소요 시간, 예매 방법과 요금을 알려줘. 모녀가 편하게 타는 팁도.`); };
@@ -1698,33 +1740,38 @@ async function apiChat(msgs, opts){
 }
 
 function compactPlan(){
-  return JSON.stringify({trip:plan.trip, days:plan.days.map((d,i)=>({day:i+1,title:d.title,macau:!!d.macau,key:d.key&&d.key.name,items:d.items.map((it,j)=>({idx:j+1,t:it.t,n:it.n}))}))});
+  return JSON.stringify({trip:plan.trip, days:plan.days.map((d,i)=>({day:i+1,title:d.title,macau:!!d.macau,key:d.key&&d.key.name,items:d.items.map((it,j)=>({id:it.id,idx:j+1,t:it.t,n:it.n}))}))});
 }
 const RULES=()=>`너는 "토끼"야. ${travelerName()?`여행자 이름은 "${travelerName()}"이고, `:""}엄마와 딸의 홍콩·마카오 3박 4일 여행을 돕는 다정하고 센스 있는 토끼 여행 도우미야. 자신을 부를 땐 "토끼"라고 해.
 [여행 조건] 11월 말 3박 4일, 숙소는 셩완 마카오 페리터미널(신덕센터) 근처 3박 고정, 하루 핵심 장소 1곳(최대 2곳) 원칙의 여유로운 일정, 엄마는 하루 1~1.5만 보 가능, 관심사는 딤섬·애프터눈티, 야경·뷰포인트, 감성 포토스팟·문화. 마카오는 하루, 날짜는 행사에 맞춰 나중에 고정.
 [주요 주제] 호텔, 경로, 명소, 항공권, 요즘 여행 핫 키워드.
 [답변 규칙] 한국어 존댓말, 휴대폰 화면 기준 짧게(최대 10줄 안팎), 필요하면 '- ' 목록. 실시간 검색을 못 하니 가격·운항편·영업시간·최신 트렌드는 '최근 기준 확인 필요'라고 짧게 밝혀. 모르는 건 지어내지 마. 토끼다운 말투는 한 답변에 한 번 정도만 살짝(예: 깡총).
-[일정 반영] 사용자가 넣어줘/바꿔줘/빼줘/옮겨줘처럼 일정 변경을 요청할 때만 도구를 써. 장소를 넣을 땐 실제 위치에 가까운 위도·경도와 구글지도 검색어(영문)를 함께 넣고, 하루 핵심 1곳 원칙이 깨지지 않게 해. 변경 후엔 무엇을 바꿨는지 한두 줄로 알려줘.${toolsOK?'':' (이번 화면에선 일정 직접 수정이 안 되니, 바꿀 내용을 말로만 제안해.)'}
+[일정 반영] 사용자가 넣어줘/바꿔줘/빼줘/옮겨줘처럼 일정 변경을 요청할 때만 도구를 써. 장소를 고치거나 뺄 땐 현재 일정 JSON의 id를 stop_id로 넘겨(순번은 변경 뒤 바뀔 수 있어). 도구가 돌려준 items가 최신 상태야. 장소를 넣을 땐 실제 위치에 가까운 위도·경도와 구글지도 검색어(영문)를 함께 넣고, 하루 핵심 1곳 원칙이 깨지지 않게 해. 변경 후엔 무엇을 바꿨는지 한두 줄로 알려줘.${toolsOK?'':' (이번 화면에선 일정 직접 수정이 안 되니, 바꿀 내용을 말로만 제안해.)'}
 [여정 선택] 상단에 여정 선택지가 있어: U=당신의 여정(사용자가 직접 꾸미는 일정), A=첫 번째 여정(현재 여정), B=두 번째 여정(조금 다른 여정), C=세 번째 여정(다른 여정). 지금 선택된 여정은 "${currentMeta().ord} · ${currentMeta().name}"이야. 사용자가 다른 여정으로 바꿔 달라고 하면 choose_plan 도구를 써. 일정 변경 도구는 항상 지금 선택된 여정에만 적용돼.
 [운영 정보] 각 장소의 영업시간·요금은 페이지에 저장된 참고값(기준일 ${INFO_ASOF})이야. 사용자가 "○○ 영업시간/요금/휴무를 △△로 바꿔줘"라고 알려주면 update_info 도구로 고쳐. 네가 아는 값으로 임의로 고치지는 마.
 [현재 일정 JSON]
 ${compactPlan()}`;
 
 function dayIdx(v){ const n=Math.round(Number(v)); if(!(n>=1&&n<=plan.days.length)) throw new Error("day는 1~"+plan.days.length+" 사이여야 해요"); return n-1; }
+function locateStop(i){
+  if(i&&i.stop_id){ const pos=stopById(String(i.stop_id)); if(!pos) throw new Error("그 id의 장소가 없어요. 현재 일정 JSON의 id를 확인해 주세요"); return pos; }
+  if(i&&i.day!=null&&i.idx!=null){ const d=plan.days[dayIdx(i.day)], k=Math.round(Number(i.idx))-1; if(!d.items[k]) throw new Error("해당 순번이 없어요"); return {d,k,it:d.items[k]}; }
+  throw new Error("stop_id 또는 day+idx가 필요해요");
+}
 const TOOLS=[
- {name:"add_stop",description:"일정의 특정 Day에 장소를 추가해. time 순서대로 자동 정렬돼. 반환: 추가된 Day와 순번.",
+ {name:"add_stop",description:"일정의 특정 Day에 장소를 추가해. time 순서대로 자동 정렬돼. 반환: 새 장소의 id와 그날 전체 목록 [{id,t,n}].",
   inputSchema:{type:"object",properties:{day:{type:"integer"},time:{type:"string",description:"HH:MM"},name:{type:"string",description:"한국어 장소명"},query:{type:"string",description:"구글지도 검색어(영문)"},lat:{type:"number"},lng:{type:"number"},why:{type:"string",description:"추천 이유 1~2문장"},note:{type:"string"},is_key:{type:"boolean",description:"그날의 핵심 장소면 true"}},required:["day","time","name","query","lat","lng","why"]},
   execute(i){ const d=plan.days[dayIdx(i.day)]; snapshot();
-    const it={t:String(i.time||""),n:String(i.name),q:String(i.query||i.name),lat:Number(i.lat),lng:Number(i.lng),why:String(i.why||""),note:i.note?String(i.note):"",key:!!i.is_key,added:true};
-    d.items.push(it); d.items.sort((a,b)=>String(a.t).localeCompare(String(b.t))); save(); render(); return {ok:true,day:Number(i.day),position:d.items.indexOf(it)+1}; }},
- {name:"remove_stop",description:"특정 Day의 idx번째 장소를 삭제해. 반환: 삭제한 장소명.",
-  inputSchema:{type:"object",properties:{day:{type:"integer"},idx:{type:"integer"}},required:["day","idx"]},
-  execute(i){ const d=plan.days[dayIdx(i.day)], k=Math.round(Number(i.idx))-1; if(!d.items[k]) throw new Error("해당 순번이 없어요"); snapshot(); const [r]=d.items.splice(k,1); save(); render(); return {removed:r.n}; }},
- {name:"update_stop",description:"특정 Day의 idx번째 장소의 시간, 이름, 이유, 메모를 수정해. 바꿀 필드만 보내.",
-  inputSchema:{type:"object",properties:{day:{type:"integer"},idx:{type:"integer"},time:{type:"string"},name:{type:"string"},why:{type:"string"},note:{type:"string"}},required:["day","idx"]},
-  execute(i){ const d=plan.days[dayIdx(i.day)], it=d.items[Math.round(Number(i.idx))-1]; if(!it) throw new Error("해당 순번이 없어요"); snapshot();
-    if(i.time) it.t=String(i.time); if(i.name) it.n=String(i.name); if(i.why) it.why=String(i.why); if(i.note!==undefined) it.note=String(i.note); it.added=true;
-    d.items.sort((a,b)=>String(a.t).localeCompare(String(b.t))); save(); render(); return {ok:true}; }},
+    const it={id:newId(),t:String(i.time||""),n:String(i.name),q:String(i.query||i.name),lat:Number(i.lat),lng:Number(i.lng),why:String(i.why||""),note:i.note?String(i.note):"",key:!!i.is_key,origin:"suzi"};
+    d.items.push(it); sortDay(d); save(); render(); return {ok:true,day:Number(i.day),stop_id:it.id,position:d.items.indexOf(it)+1,items:daySummary(d)}; }},
+ {name:"remove_stop",description:"장소를 삭제해. stop_id(현재 일정 JSON의 id)로 지정하는 것이 정확해. 없으면 day+idx. 반환: 삭제한 장소명과 그날 목록.",
+  inputSchema:{type:"object",properties:{stop_id:{type:"string"},day:{type:"integer"},idx:{type:"integer"}}},
+  execute(i){ const pos=locateStop(i); snapshot(); const [r]=pos.d.items.splice(pos.k,1); save(); render(); return {removed:r.n,items:daySummary(pos.d)}; }},
+ {name:"update_stop",description:"장소의 시간, 이름, 이유, 메모, 핵심 여부를 수정해. stop_id(현재 일정 JSON의 id)로 지정하는 것이 정확해. 없으면 day+idx. 바꿀 필드만 보내. 반환: 그날 목록.",
+  inputSchema:{type:"object",properties:{stop_id:{type:"string"},day:{type:"integer"},idx:{type:"integer"},time:{type:"string"},name:{type:"string"},why:{type:"string"},note:{type:"string"},is_key:{type:"boolean"}}},
+  execute(i){ const pos=locateStop(i), it=pos.it, d=pos.d; snapshot();
+    if(i.time) it.t=String(i.time); if(i.name) it.n=String(i.name); if(i.why) it.why=String(i.why); if(i.note!==undefined) it.note=String(i.note); if(i.is_key!==undefined) it.key=!!i.is_key; if(it.origin==='template') it.origin='suzi';
+    sortDay(d); save(); render(); return {ok:true,stop_id:it.id,items:daySummary(d)}; }},
  {name:"swap_days",description:"두 Day의 일정을 통째로 맞바꿔. 마카오 날짜를 옮길 때 사용. 반환: 바뀐 Day 순서.",
   inputSchema:{type:"object",properties:{a:{type:"integer"},b:{type:"integer"}},required:["a","b"]},
   execute(i){ const a=dayIdx(i.a), b=dayIdx(i.b); snapshot(); [plan.days[a],plan.days[b]]=[plan.days[b],plan.days[a]];
@@ -1739,7 +1786,7 @@ const TOOLS=[
     INFO_EDIT[q]=ed; saveInfoEdit(); if(!infosheet.hidden) openInfo(it); return {updated:it.n, fields:Object.keys(ed)}; }},
  {name:"set_trip_info",description:"상단 여행 정보(날짜, 가는 편, 오는 편, 마카오 가는 날)를 갱신해. 바꿀 필드만 보내.",
   inputSchema:{type:"object",properties:{dates:{type:"string"},flight_in:{type:"string"},flight_out:{type:"string"},macau:{type:"string"}}},
-  execute(i){ snapshot(); const t=plan.trip; if(i.dates) t.dates=String(i.dates); if(i.flight_in) t.flightIn=String(i.flight_in); if(i.flight_out) t.flightOut=String(i.flight_out); if(i.macau) t.macau=String(i.macau); save(); render(); return {ok:true}; }}
+  execute(i){ snapshot(); const t=plan.trip; if(i.dates) t.dates={...(t.dates||{}),label:String(i.dates)}; if(i.flight_in) t.flights.in={...(t.flights.in||{}),code:String(i.flight_in)}; if(i.flight_out) t.flights.out={...(t.flights.out||{}),code:String(i.flight_out)}; if(i.macau) t.macau=String(i.macau); save(); render(); return {ok:true}; }}
 ];
 
 const ERR={not_granted:"토끼 도우미 사용이 허용되지 않았어요. 아티팩트에선 권한에서 Claude 사용을 허용하고, 외부 서버·키 방식에선 연결 설정의 주소·토큰·키를 확인해 주세요.",invalid_request:"요청 형식이 맞지 않아요. 연결 설정의 모델 이름을 확인해 주세요.",upstream_error:"서버가 잠깐 불안정해요. 조금 뒤 다시 보내 주세요.",empty_completion:"답을 만들지 못했어요. 질문을 조금 바꿔 다시 물어봐 주세요.",sampling_disabled:"이 계정에서는 토끼 도우미를 쓸 수 없어요.",rate_limited:"질문이 많아 잠깐 쉬어야 해요. 조금 뒤 다시 물어봐 주세요.",session_expired:"로그인이 만료됐어요. 다시 로그인해 주세요.",refused:"이 질문에는 답하기 어려워요. 다르게 물어봐 주세요.",prompt_too_large:"대화가 너무 길어졌어요. 페이지를 새로 열고 다시 물어봐 주세요."};
