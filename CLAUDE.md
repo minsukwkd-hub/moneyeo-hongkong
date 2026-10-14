@@ -13,10 +13,10 @@
 - 일정 데이터: `PLAN_A`(현재 여정) `PLAN_B`(조금 다른) `PLAN_C`(다른) `PLAN_U`(당신의 여정 = 직접 꾸미기 뼈대) → `PLANS` 배열. 저장: localStorage `suzi-hk-plan-v2:<id>`, 선택 여정 `suzi-hk-variant`.
 - 장소 사전: `CATALOG`(세 여정 + `EXTRA`에서 q 기준 중복 제거, `areaOf`로 지역 분류). 운영 정보: `INFO` (키 = 구글지도 검색어 q; `hours, fee, tip, site, siteName, src, upd, conf`). 기준일 `INFO_ASOF`. 사용자/SUZI 수정 오버레이 `INFO_EDIT` → `suzi-hk-info-v1`.
 - 렌더: `render()` 하나가 상단 상태·여정 선택 버튼·탭·Day 섹션·전체 지도를 모두 다시 그린다. 지도는 Leaflet + 내장 해안선 `LANDGEO`(타일 없음) — 좌표는 홍콩·마카오 범위만 의미 있음.
-- 시트: SUZI(`#sheet`), 장소 넣기(`#addsheet`, 직접 꾸미기에서만), 장소 정보(`#infosheet`, 제목 클릭).
+- 시트: SUZI(`#sheet`), 장소 넣기(`#addsheet`, 직접 꾸미기에서만, 직접 입력 폼 포함), 장소 정보(`#infosheet`, 제목 클릭), 여행 정보(`#tripsheet`, 상태 타일 클릭), 챙김 메모(`#bridgesheet`).
 - SUZI 연결 어댑터(`connect()`): ① claude.ai 아티팩트 `window.claude` sample → ② 외부 서버(`CONN.url`, Bearer 토큰) → ③ API 키 직접(테스트용). 설정은 ⚙, localStorage `suzi-hk-conn-v1`. 공유용 기본값은 `SUZI_DEFAULT` 상수.
 - SUZI 직접 호출(`apiChat`): Messages API 스트리밍(SSE) + 수동 tool loop. 모델 기본 `claude-opus-5-5`, `output_config.effort:"high"`, `fallbacks:"default"`(beta 헤더 `server-side-fallback-2026-07-01`). thinking 블록은 서명 포함 그대로 되돌려 보낸다.
-- SUZI 도구: add_stop / remove_stop / update_stop / swap_days / choose_plan / update_info / set_trip_info.
+- SUZI 도구: add_stop / remove_stop / update_stop(stop_id 우선, dur) / reorder_stops / add_bridge / remove_bridge / swap_days / choose_plan / update_info / set_trip_info(날짜·숙소·동행).
 - 파일이 크다(≈280KB, LANDGEO 때문). 편집은 정확한 문자열 치환으로 하고, 끝나면 `<script>` 본문을 `new Function`으로 문법 검사한다.
 
 ## 작업 규칙
@@ -30,7 +30,7 @@
 ## 진행 상태 (2026-10-14)
 - SUZI 프록시: **Cloudflare Worker 운영 중, 종단 검증 완료** https://suzi-proxy.suzi-proxy.workers.dev/ (계정 이메일 minsukwkd+cf@gmail.com). 시크릿은 `ANTHROPIC_API_KEY` 하나. **서버 토큰은 쓰지 않기로 결정**(Origin 제한·IP당 30회/분·월 한도로 방어). **실행 위치는 도쿄 고정(`[placement] region`)** — Anthropic이 홍콩(HKG) 발신을 403으로 막기 때문. 이 설정을 지우면 홍콩 현지에서 SUZI가 죽는다. Vercel 배포본(https://suzi-proxy.vercel.app/api/suzi, hnd1 고정)은 예비.
 - `SUZI_DEFAULT.url`은 Cloudflare 주소, `token`은 빈 값이 정상. 저장된 연결 설정은 사용자가 직접 바꾼 경우(`custom:true`)가 아니면 항상 `SUZI_DEFAULT`를 따른다.
-- 설계: `docs/설계.md`(v3, 개정 2)가 장기 구조·데이터 모델·착수 순서(M0~M4)의 기준. **M0·M1a·M1b·M2a 완료**(이름/토끼 호칭/인앱 띠 · 모델 v3 정규화+repo+SUZI id 도구 · 내보내기/불러오기 · 여행 정보 시트). 다음은 M2b(순서 변경·소요/이동시간·부하 경고), M2c(미등록 장소·브릿지 카드).
+- 설계: `docs/설계.md`(v3, 개정 2)가 장기 구조·데이터 모델·착수 순서(M0~M4)의 기준. **M0·M1·M2 완료**(이름/토끼 호칭/인앱 띠 · 모델 v3+repo+SUZI id 도구 · 내보내기/불러오기 · 여행 정보 시트 · ▲▼ 순서/이동시간/부하 경고 · 직접 장소/챙김 메모). 다음은 M3(공유 링크·사진·방문 체크/메모/지출/일기·여행 목록). 템플릿 읽기 전용 전환은 테스트 피드백 뒤.
 - 저장 키: 여행 `tokki-trip:<U|A|B|C>`(옛 `suzi-hk-plan-v2:*`는 백업으로 남김), 설정 `tokki-settings-v1`, 대화 `tokki-chat-v1`, 정보 오버레이 `suzi-hk-info-v1`.
 - 설정 저장소: localStorage `tokki-settings-v1` `{v, profile:{name}}`. 이후 conn·last 등도 여기로 모은다(설계 2.10).
 

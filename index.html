@@ -835,6 +835,15 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
 .tl .mv:disabled{opacity:.3;cursor:default}
 .tl li.gap{padding-block:0;border-top:0}
 .tl li.gap .c{font-size:12px;color:var(--muted);font-family:var(--mono);padding:2px 0}
+.customwrap{padding:0 16px 8px;flex:none}
+.customform{padding:6px 0 0}
+.tl li.bridge{padding-block:4px;border-top:0}
+.tl li.bridge .c{display:flex;align-items:center;gap:8px;font-size:13.5px;background:var(--blush);border-radius:10px;padding:8px 10px}
+.tl li.bridge .bl{display:flex;gap:8px;align-items:center;flex:1;cursor:pointer}
+.tl li.bridge .bl input{width:18px;height:18px;accent-color:var(--accent);flex:none}
+.tl li.bridge.done .bl span{text-decoration:line-through;color:var(--muted)}
+.tl li.bridge .bx{border:0;background:none;font-size:18px;line-height:1;color:var(--muted);cursor:pointer;padding:0 2px}
+.bpresets{display:flex;gap:6px;flex-wrap:wrap}
 .callout.warn{border-left-color:var(--pin)}
 .callout.warn b{color:var(--pin)}
 .rm{border:0;background:none;color:var(--pin);font-size:12.5px;cursor:pointer;padding:0;font-weight:700}
@@ -997,11 +1006,36 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
     </div>
   </div>
   <input class="search" id="search" type="search" placeholder="장소 이름으로 찾기" aria-label="장소 찾기">
+  <div class="customwrap"><button class="linkbtn" id="customToggle" type="button">목록에 없는 장소 직접 넣기</button>
+   <form class="cform customform" id="customForm" autocomplete="off" hidden>
+    <label>장소 이름 <input id="cpName" type="text" maxlength="60" placeholder="예: 카페 OO"></label>
+    <div class="row"><label>종류 <select id="cpKind"><option>명소</option><option>식당</option><option>카페</option><option>전망</option><option>쇼핑</option><option>교통</option></select></label><label>지역 <select id="cpArea"></select></label></div>
+    <label>위치 (선택) <input id="cpLoc" type="text" inputmode="text" placeholder="구글지도에서 꾹 눌러 복사한 좌표 (예: 22.2819, 114.1580)"></label>
+    <label>메모 (선택) <input id="cpNote" type="text" maxlength="120" placeholder="예: 11시 전에 가면 줄이 짧아요"></label>
+    <p class="fine" id="cpHint" hidden></p>
+    <div class="row"><button class="send" type="submit">이 장소 선택</button><button class="ghost" type="button" id="customCancel">닫기</button></div>
+    <p class="fine">위치를 비워 두면 고른 지역의 중심에 핀이 찍혀요. 넣은 장소는 이 기기의 목록에 남아 다음에도 고를 수 있어요.</p>
+   </form></div>
   <div class="chips" id="areas"></div>
   <div class="catalog" id="catalog"></div>
  </div>
 </div>
 
+<div class="sheet" id="bridgesheet" role="dialog" aria-modal="true" aria-labelledby="bridgeTitle" hidden>
+ <div class="sheet-in">
+  <div class="sh-head">
+    <div class="av plus" aria-hidden="true">♡</div>
+    <div><h2 id="bridgeTitle">챙김 메모</h2><p>일정 사이에 끼워 두는 따뜻한 한 줄이에요. 그날 체크하며 지나가요</p></div>
+    <button class="x" id="bridgeClose" type="button" aria-label="닫기">×</button>
+  </div>
+  <form class="cform tripform" id="bridgeForm" autocomplete="off">
+   <label>문구 <input id="bText" type="text" maxlength="60" placeholder="예: 비타민 챙겨 먹기"></label>
+   <div class="bpresets" id="bPresets"></div>
+   <label>어디에 <select id="bAfter"></select></label>
+   <div class="row"><button class="send" type="submit">넣기</button><button class="ghost" type="button" id="bridgeCancel">취소</button></div>
+  </form>
+ </div>
+</div>
 <div class="sheet" id="tripsheet" role="dialog" aria-modal="true" aria-labelledby="tripTitle" hidden>
  <div class="sheet-in">
   <div class="sh-head">
@@ -1282,7 +1316,7 @@ function findItemByName(name){
   return all.find(it=>(it.n||"").toLowerCase()===s)||all.find(it=>(it.n||"").toLowerCase().includes(s)||(it.q||"").toLowerCase().includes(s))||null;
 }
 const KIND={"명소":"명소","식당":"식당","카페":"카페","호텔":"호텔","페리":"페리","교통":"교통","전망":"전망","쇼핑":"쇼핑"};
-function kindOf(it){ const inf=infoOf(it.q); if(it.hotel) return "호텔"; if(inf&&inf.type) return inf.type; const q=(it.q||"")+" "+(it.n||""); if(/ferry|페리/i.test(q)) return "페리"; if(/airport|station|tram|bus|360|escalator|공항|역|트램|버스/i.test(q)) return "교통"; if(/cafe|bakery|카페|에그타르트/i.test(q)) return "카페"; if(/restaurant|dim sum|딤섬|점심|저녁|브런치|티/i.test(q)) return "식당"; return "명소"; }
+function kindOf(it){ const inf=infoOf(it.q); if(it.hotel) return "호텔"; if(it.kind&&KIND[it.kind]) return it.kind; if(inf&&inf.type) return inf.type; const q=(it.q||"")+" "+(it.n||""); if(/ferry|페리/i.test(q)) return "페리"; if(/airport|station|tram|bus|360|escalator|공항|역|트램|버스/i.test(q)) return "교통"; if(/cafe|bakery|카페|에그타르트/i.test(q)) return "카페"; if(/restaurant|dim sum|딤섬|점심|저녁|브런치|티/i.test(q)) return "식당"; return "명소"; }
 const AREAS=["홍콩섬","구룡","홍콩섬 남부","란타우·공항","마카오"];
 function areaOf(p){ if(p.lng<113.75) return "마카오"; if(p.lng<114.05) return "란타우·공항"; if(p.lat>=22.29) return "구룡"; if(p.lat<22.245) return "홍콩섬 남부"; return "홍콩섬"; }
 const CATALOG=(()=>{
@@ -1319,7 +1353,7 @@ function normalizeDoc(p){
     if(!d||typeof d!=="object") return;
     if(!d.id) d.id=newId();
     if(!Array.isArray(d.items)) d.items=[];
-    if(!Array.isArray(d.bridges)) d.bridges=[];
+    if(!Array.isArray(d.bridges)) d.bridges=[]; d.bridges.forEach(b=>{ if(b&&typeof b==="object"&&!b.id) b.id=newId(); });
     if(!Array.isArray(d.expenses)) d.expenses=[];
     d.items.forEach(it=>{
       if(!it||typeof it!=="object") return;
@@ -1420,6 +1454,30 @@ function loadWarning(d){
   if(!msgs.length) return "";
   return msgs.join(", ")+`이에요. ${party==="모녀"?"엄마 컨디션을 생각하면 ":""}한두 곳 덜어 내거나 다른 날로 옮기면 여유로워요.`;
 }
+// ---- 사용자 장소 사전 (M2c): 목록에 없는 장소를 직접 넣으면 이 기기에 남는다 ----
+const PLACES_KEY="tokki-places-v1";
+let CUSTOM_PLACES=[]; try{ const a=JSON.parse(localStorage.getItem(PLACES_KEY)||"[]"); if(Array.isArray(a)) CUSTOM_PLACES=a.filter(p=>p&&p.n&&isFinite(p.lat)&&isFinite(p.lng)); }catch(e){ CUSTOM_PLACES=[]; }
+function saveCustomPlaces(){ try{ localStorage.setItem(PLACES_KEY, JSON.stringify(CUSTOM_PLACES.slice(-200))); }catch(e){} }
+function allPlaces(){ return CUSTOM_PLACES.length?[...CUSTOM_PLACES,...CATALOG]:CATALOG; }
+// "22.2819, 114.1580" · 구글지도 링크의 @lat,lng · !3dLAT!4dLNG · q=lat,lng
+function parseLatLng(text){
+  const t=String(text||"").trim(); if(!t) return null;
+  let m=t.match(/@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/)||t.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/)||t.match(/[?&]q=(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/)||t.match(/(-?\d{1,2}\.\d{3,})[,\s]+(-?\d{1,3}\.\d{3,})/);
+  if(!m) return null; const lat=+m[1], lng=+m[2]; if(!(Math.abs(lat)<=90&&Math.abs(lng)<=180)) return null; return {lat,lng};
+}
+function inHK(lat,lng){ return lat>21.9&&lat<22.7&&lng>113.3&&lng<114.5; }
+// 브릿지(챙김 메모): 장소 id에 붙는다. 장소가 빠지면 앞 장소로 옮겨 붙인다.
+function bridgesAt(d,afterId){ const ids=new Set(d.items.map(x=>x.id)); return (d.bridges||[]).filter(b=>afterId===null?(!b.after||!ids.has(b.after)):b.after===afterId); }
+function onStopRemoved(d,k){ const rid=d.items[k]&&d.items[k].id, prev=k>0?d.items[k-1].id:null; (d.bridges||[]).forEach(b=>{ if(b.after===rid) b.after=prev; }); }
+const BRIDGE_PRESETS={
+  "모녀":["비타민 챙겨 먹기","엄마 컨디션 확인하기","물 한 병 사기","같이 사진 한 장 찍기","발 아프면 택시 타기","화장실 들르기","간식 챙기기","선크림 바르기"],
+  "가족":["물 한 병 사기","쉬어 가기","같이 사진 한 장 찍기","화장실 들르기","간식 챙기기","보조배터리 확인"],
+  "부부":["물 한 병 사기","쉬어 가기","같이 사진 한 장 찍기","카페에서 한숨 돌리기","보조배터리 확인"],
+  "친구":["물 한 병 사기","사진 찍기","옥토퍼스 잔액 확인","보조배터리 확인","다음 장소 영업시간 확인"],
+  "혼자":["물 한 병 사기","쉬어 가기","사진 한 장","옥토퍼스 잔액 확인","보조배터리 확인"]
+};
+// 복사·불러오기 때 id를 새로 발급하되 브릿지의 after 연결은 따라오게 한다
+function reissueIds(doc){ doc.days.forEach(d=>{ const map=new Map(); d.id=newId(); (d.items||[]).forEach(it=>{ const nid=newId(); if(it.id) map.set(it.id,nid); it.id=nid; }); (d.bridges||[]).forEach(b=>{ b.id=newId(); b.after=b.after&&map.has(b.after)?map.get(b.after):null; }); }); return doc; }
 // 순서 바꾸기: 시간 칸(슬롯)은 그대로 두고 장소만 자리를 바꾼다. 시간순 자동 정렬과 충돌하지 않는다.
 function moveStop(d,k,dir){ const j=k+dir; if(j<0||j>=d.items.length) return false; const a=d.items[k], b=d.items[j]; const ta=a.t; a.t=b.t; b.t=ta; d.items[k]=b; d.items[j]=a; return true; }
 function reorderStops(d,ids){
@@ -1531,12 +1589,14 @@ function render(){
     const keyCard=custom?(keyIt?{name:keyIt.n,why:keyIt.why}:null):d.key;
     const LD=dayLoad(d), warn=custom?loadWarning(d):''; const sub0=custom?`${LD.count}곳 · 약 ${fmtMin(LD.total)} · 오늘의 한 곳 ${keyIt?keyIt.n:'미정'}`:(d.sub||''); const dd=dayDate(di); const sub=dd?(dd+(sub0?' · '+sub0:'')):sub0;
     sec.innerHTML=`<div class="dayhead"><div class="daynum">${String(di+1).padStart(2,'0')}</div><h2>${esc(d.title)}</h2><div class="sub">${esc(sub)}</div></div>`
-      +(custom?`<div class="dayact"><button class="ghost addbtn" type="button" data-day="${di+1}">＋ 장소 넣기</button>${d.items.some(x=>!x.hotel)?'':'<span class="hint">아직 비어 있어요. 장소를 골라 넣어 보세요.</span>'}</div>`:'')
+      +(custom?`<div class="dayact"><button class="ghost addbtn" type="button" data-day="${di+1}">＋ 장소 넣기</button><button class="ghost brbtn" type="button" data-day="${di+1}">♡ 챙김 메모</button>${d.items.some(x=>!x.hotel)?'':'<span class="hint">아직 비어 있어요. 장소를 골라 넣어 보세요.</span>'}</div>`:'')
       +(warn?`<div class="callout warn"><b>오늘은 좀 빡빡해요</b> ${esc(warn)}</div>`:'')
       +(isMac(d)?`<div class="callout"><b>날짜 고정 예정</b> 마카오 행사 날짜가 정해지면 토끼에게 "마카오를 Day ○로 옮겨줘"라고 하세요. 11월 하순 그랑프리 기간엔 도로 통제와 페리 혼잡이 있을 수 있어요.</div>`:'')
       +(keyCard?`<div class="key"><div class="lbl">오늘의 한 곳</div><h3>${esc(keyCard.name)}</h3><p>${esc(keyCard.why||'')}</p></div>`:'')
       +`<div class="mapbox"><div class="map"></div><button class="expand" type="button" data-big="d${di+1}" data-title="Day ${di+1} 지도">크게 보기</button></div><ol class="tl"></ol>`;
     const ol=sec.querySelector('ol');
+    const bridgeLi=b=>{ const li=document.createElement('li'); li.className='bridge'+(b.done?' done':'')+(custom?' ed':''); li.dataset.bid=b.id; li.dataset.day=di; li.innerHTML=`<div class="t"></div><div class="c"><label class="bl"><input type="checkbox" class="bdone" ${b.done?'checked':''} aria-label="${esc(b.text)} 완료"> <span>${esc(b.text)}</span></label>${custom?'<button class="bx" type="button" aria-label="챙김 메모 빼기">×</button>':''}</div>`; return li; };
+    bridgesAt(d,null).forEach(b=>ol.appendChild(bridgeLi(b)));
     d.items.forEach((it,ii)=>{
       const added=it.origin==='me'||it.origin==='suzi';
       const li=document.createElement('li');
@@ -1546,6 +1606,7 @@ function render(){
       const tcell=custom?`<div class="t"><input type="time" class="tin" value="${esc(it.t||'')}" aria-label="시간"></div>`:`<div class="t">${esc(it.t||'')}</div>`;
       li.innerHTML=`${tcell}<div class="c"><div class="name"><span class="pn">${ii+1}</span><button class="nm" type="button" aria-label="${esc(it.n)} 정보 보기">${esc(it.n)}${tag}</button></div><p class="why">${esc(it.why||'')}</p>${it.note?`<p class="note">${esc(it.note)}</p>`:''}<div class="act"><a class="gm" href="${gm(it.q||it.n)}" target="_blank" rel="noopener">구글 지도에서 열기 ↗</a>${custom?`<button class="mv" type="button" data-dir="-1" aria-label="위로" ${ii===0?'disabled':''}>▲</button><button class="mv" type="button" data-dir="1" aria-label="아래로" ${ii===d.items.length-1?'disabled':''}>▼</button><button class="rm" type="button">빼기</button>`:''}</div></div>`;
       ol.appendChild(li);
+      bridgesAt(d,it.id).forEach(b=>ol.appendChild(bridgeLi(b)));
       const nx=d.items[ii+1]; if(nx){ const tr=travelBetween(it,nx); if(tr&&tr.label){ const g=document.createElement('li'); g.className='gap'+(custom?' ed':''); g.setAttribute('aria-hidden','true'); g.innerHTML=`<div class="t"></div><div class="c">↓ ${esc(tr.label)}</div>`; ol.appendChild(g); } }
     });
     host.appendChild(sec);
@@ -1609,7 +1670,7 @@ function validateDoc(p){
   const L=Array.isArray(t.lodging)&&t.lodging[0]; if(L&&L.name&&isFinite(+L.lat)&&isFinite(+L.lng)) out.trip.lodging=[{name:S(L.name,60),area:S(L.area,20),q:S(L.q||L.name,120),lat:+L.lat,lng:+L.lng}];
   out.days=p.days.slice(0,30).map(d=>{ d=d&&typeof d==="object"?d:{};
     const items=(Array.isArray(d.items)?d.items:[]).filter(it=>it&&typeof it==="object"&&isFinite(+it.lat)&&isFinite(+it.lng)&&Math.abs(+it.lat)<=90&&Math.abs(+it.lng)<=180).slice(0,50)
-      .map(it=>({t:S(it.t,5),n:S(it.n,80),q:S(it.q||it.n,120),lat:+it.lat,lng:+it.lng,why:S(it.why,500),note:it.note?S(it.note,500):undefined,key:!!it.key,hotel:it.hotel?true:undefined,origin:["me","suzi","template"].includes(it.origin)?it.origin:"me"}));
+      .map(it=>({id:it.id?S(it.id,16):undefined,t:S(it.t,5),n:S(it.n,80),q:S(it.q||it.n,120),lat:+it.lat,lng:+it.lng,why:S(it.why,500),note:it.note?S(it.note,500):undefined,key:!!it.key,hotel:it.hotel?true:undefined,origin:["me","suzi","template"].includes(it.origin)?it.origin:"me",kind:KIND[it.kind]?it.kind:undefined,dur:(+it.dur>0&&+it.dur<=600)?Math.round(+it.dur):undefined}));
     const bridges=(Array.isArray(d.bridges)?d.bridges:[]).slice(0,30).map(b=>({after:b&&b.after?S(b.after,16):null,text:S(b&&b.text,120),done:!!(b&&b.done)}));
     return {title:S(d.title,80)||"",sub:d.sub?S(d.sub,120):undefined,macau:d.macau?true:undefined,items,bridges};
   });
@@ -1618,7 +1679,7 @@ function validateDoc(p){
 let importPending=null;
 document.getElementById('exportBtn').onclick=()=>{ exportDoc(); };
 document.getElementById('importBtn').onclick=()=>{ document.getElementById('importFile').click(); };
-function applyImport(doc){ repo.save('U', doc); importPending=null; document.getElementById('importConfirm').hidden=true; variant='U'; plan=repo.load('U'); history=[]; document.getElementById('undo').disabled=true; save(); render(); ioMsg('"당신의 여정"으로 불러왔어요'); const sec=document.getElementById('d1'); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'}); }
+function applyImport(doc){ reissueIds(doc); repo.save('U', doc); importPending=null; document.getElementById('importConfirm').hidden=true; variant='U'; plan=repo.load('U'); history=[]; document.getElementById('undo').disabled=true; save(); render(); ioMsg('"당신의 여정"으로 불러왔어요'); const sec=document.getElementById('d1'); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'}); }
 document.getElementById('importFile').onchange=async e=>{
   const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
   if(f.size>2*1024*1024){ ioMsg('파일이 너무 커요 (2MB 이하)'); return; }
@@ -1632,6 +1693,20 @@ document.getElementById('importFile').onchange=async e=>{
 };
 document.getElementById('importYes').onclick=()=>{ if(importPending) applyImport(importPending); };
 document.getElementById('importNo').onclick=()=>{ importPending=null; document.getElementById('importConfirm').hidden=true; };
+
+// ---- 챙김 메모 시트 (M2c) ----
+const bridgesheet=document.getElementById('bridgesheet'); let bridgeDay=0;
+function openBridge(day){
+  bridgeDay=dayIdx(day); const d=plan.days[bridgeDay], f=document.getElementById('bridgeForm'); f.reset();
+  const party=(plan.trip.party&&plan.trip.party.type)||"모녀"; const presets=BRIDGE_PRESETS[party]||BRIDGE_PRESETS["가족"];
+  document.getElementById('bPresets').innerHTML=presets.map(t=>`<button class="chip" type="button" data-t="${esc(t)}">${esc(t)}</button>`).join('');
+  const sel=f.querySelector('#bAfter'); sel.innerHTML=`<option value="">Day ${day} 맨 처음</option>`+d.items.map(it=>`<option value="${esc(it.id)}">${esc(it.t||'')} ${esc(it.n)} 뒤</option>`).join(''); if(d.items.length) sel.value=d.items[d.items.length-1].id;
+  bridgesheet.hidden=false; scrim.hidden=false; fab.hidden=true; setTimeout(()=>f.querySelector('#bText').focus(),50);
+}
+function closeBridge(){ bridgesheet.hidden=true; scrim.hidden=true; fab.hidden=false; }
+document.getElementById('bPresets').onclick=e=>{ const b=e.target.closest('.chip'); if(!b) return; document.getElementById('bText').value=b.dataset.t; };
+document.getElementById('bridgeClose').onclick=closeBridge; document.getElementById('bridgeCancel').onclick=closeBridge;
+document.getElementById('bridgeForm').onsubmit=e=>{ e.preventDefault(); const text=document.getElementById('bText').value.trim().slice(0,60); if(!text) return; const d=plan.days[bridgeDay]; if(!d) return; const after=document.getElementById('bAfter').value||null; snapshot(); d.bridges.push({id:newId(),after,text,done:false}); save(); render(); closeBridge(); const sec=document.getElementById('d'+(bridgeDay+1)); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'}); };
 
 // ---- 여행 정보 시트 (M2a) ----
 const tripsheet=document.getElementById('tripsheet');
@@ -1659,7 +1734,7 @@ document.getElementById('picker').onclick=e=>{ const b=e.target.closest('.pick')
 document.getElementById('pickdesc').addEventListener('click',e=>{
   const b=e.target.closest('#copyToMine'); if(!b) return;
   const cur=loadPlan('U'), filled=cur.days.reduce((n,d)=>n+d.items.filter(x=>!x.hotel).length,0);
-  const doCopy=()=>{ const copy=structuredClone(plan); copy.days.forEach(d=>{ delete d.key; delete d.sub; delete d.macau; delete d.id; d.items.forEach(it=>{ delete it.id; }); }); copy.templateId=variant; delete copy.createdAt; repo.save('U', normalizeDoc(copy)); switchPlan('U'); document.getElementById('d1').scrollIntoView({behavior:'smooth',block:'start'}); };
+  const doCopy=()=>{ const copy=structuredClone(plan); copy.days.forEach(d=>{ delete d.key; delete d.sub; delete d.macau; }); reissueIds(copy); copy.templateId=variant; delete copy.createdAt; repo.save('U', normalizeDoc(copy)); switchPlan('U'); document.getElementById('d1').scrollIntoView({behavior:'smooth',block:'start'}); };
   if(filled<=4){ doCopy(); return; }
   if(b.dataset.arm){ doCopy(); return; }
   b.dataset.arm='1'; b.classList.add('warn'); b.textContent='지금 "당신의 여정"을 덮어쓰게 돼요. 한 번 더 누르면 복사해요';
@@ -1676,7 +1751,7 @@ function openAdd(day){
 function closeAdd(){ addsheet.hidden=true; scrim.hidden=true; fab.hidden=false; }
 function renderCatalog(){
   const qv=document.getElementById('search').value.trim().toLowerCase();
-  const list=CATALOG.filter(p=>(addArea==="전체"||p.area===addArea)&&(!qv||p.n.toLowerCase().includes(qv)||p.q.toLowerCase().includes(qv)));
+  const list=allPlaces().filter(p=>(addArea==="전체"||p.area===addArea)&&(!qv||p.n.toLowerCase().includes(qv)||p.q.toLowerCase().includes(qv)));
   document.getElementById('areas').innerHTML=["전체",...AREAS].map(a=>`<button class="chip${a===addArea?' on':''}" type="button" data-a="${esc(a)}">${esc(a)}</button>`).join('');
   document.getElementById('catalog').innerHTML=list.length?list.map(p=>`<button class="pl${addSel===p?' on':''}" type="button" data-q="${esc(p.q)}" aria-pressed="${addSel===p}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)}</span><span class="w">${esc(p.why)}</span></button>`).join(''):'<p class="hint">찾는 장소가 없어요. 토끼에게 "○○ 넣어줘"라고 해 보세요.</p>';
 }
@@ -1684,22 +1759,39 @@ function updateAddForm(){ document.getElementById('selName').textContent=addSel?
 document.getElementById('addClose').onclick=closeAdd;
 document.getElementById('search').addEventListener('input',renderCatalog);
 document.getElementById('areas').onclick=e=>{ const b=e.target.closest('.chip'); if(b){ addArea=b.dataset.a; renderCatalog(); } };
-document.getElementById('catalog').onclick=e=>{ const b=e.target.closest('.pl'); if(!b) return; addSel=CATALOG.find(p=>p.q===b.dataset.q)||null; renderCatalog(); updateAddForm(); };
+document.getElementById('catalog').onclick=e=>{ const b=e.target.closest('.pl'); if(!b) return; addSel=allPlaces().find(p=>p.q===b.dataset.q)||null; renderCatalog(); updateAddForm(); };
+// 목록에 없는 장소 직접 넣기
+document.getElementById('customToggle').onclick=()=>{ const f=document.getElementById('customForm'); f.hidden=!f.hidden; if(!f.hidden){ const sel=f.querySelector('#cpArea'); sel.innerHTML=Object.keys(LODGE_AREAS).map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join(''); setTimeout(()=>f.querySelector('#cpName').focus(),50); } };
+document.getElementById('customCancel').onclick=()=>{ document.getElementById('customForm').hidden=true; };
+document.getElementById('customForm').onsubmit=e=>{ e.preventDefault(); const f=e.target, hint=f.querySelector('#cpHint');
+  const name=f.querySelector('#cpName').value.trim().slice(0,60); if(!name){ hint.textContent='장소 이름을 적어 주세요'; hint.hidden=false; return; }
+  const kind=f.querySelector('#cpKind').value, area=f.querySelector('#cpArea').value, locTxt=f.querySelector('#cpLoc').value.trim();
+  let ll=parseLatLng(locTxt), note='';
+  if(locTxt&&!ll){ hint.textContent=/maps\.app\.goo\.gl|goo\.gl/.test(locTxt)?'짧은 링크에는 좌표가 없어요. 구글지도에서 그 자리를 꾹 눌러 나오는 좌표를 복사해 붙여 주세요. 비워 두면 지역 중심에 찍혀요.':'좌표를 읽지 못했어요. "22.2819, 114.1580" 모양으로 붙여 주세요. 비워 두면 지역 중심에 찍혀요.'; hint.hidden=false; return; }
+  if(!ll){ const c=LODGE_AREAS[area]||LODGE_AREAS["센트럴"]; ll={lat:c[0],lng:c[1]}; note='위치는 '+area+' 중심으로 임시 표시'; }
+  else if(!inHK(ll.lat,ll.lng)){ note='홍콩·마카오 밖 좌표라 지도에는 안 보일 수 있어요'; }
+  const place={n:name,q:name+(area==="마카오"?" Macau":" Hong Kong"),lat:ll.lat,lng:ll.lng,why:'',note:f.querySelector('#cpNote').value.trim().slice(0,120),area:areaOf(ll)||area,kind,custom:true};
+  const k=CUSTOM_PLACES.findIndex(p=>p.q===place.q); if(k>=0) CUSTOM_PLACES[k]=place; else CUSTOM_PLACES.unshift(place); saveCustomPlaces();
+  addSel=CUSTOM_PLACES.find(p=>p.q===place.q); addArea="전체"; f.hidden=true; f.reset(); hint.hidden=true; renderCatalog(); updateAddForm();
+  document.getElementById('selName').textContent='선택: '+place.n+(note?' · '+note:''); };
 document.getElementById('addGo').onclick=()=>{
   if(!addSel) return;
   const di=dayIdx(document.getElementById('addDay').value), d=plan.days[di];
   const tm=document.getElementById('addTime').value||"10:00";
   snapshot();
-  d.items.push({id:newId(),t:tm,n:addSel.n,q:addSel.q,lat:addSel.lat,lng:addSel.lng,why:addSel.why,note:addSel.note,key:document.getElementById('addKey').checked,origin:"me"});
+  d.items.push({id:newId(),t:tm,n:addSel.n,q:addSel.q,lat:addSel.lat,lng:addSel.lng,why:addSel.why,note:addSel.note,key:document.getElementById('addKey').checked,origin:"me",...(addSel.kind?{kind:addSel.kind}:{})});
   sortDay(d); save(); render(); closeAdd();
   const sec=document.getElementById('d'+(di+1)); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'});
 };
 document.getElementById('days').addEventListener('click',e=>{
   const ab=e.target.closest('.addbtn'); if(ab){ openAdd(+ab.dataset.day); return; }
   const mv=e.target.closest('.mv'); if(mv){ const li=mv.closest('li'); const d=plan.days[+li.dataset.day], k=+li.dataset.idx; if(!d||!d.items[k]) return; snapshot(); if(moveStop(d,k,+mv.dataset.dir)){ save(); render(); const sec=document.getElementById('d'+(+li.dataset.day+1)); const nl=sec&&sec.querySelector(`li[data-idx="${k+(+mv.dataset.dir)}"] .mv[data-dir="${mv.dataset.dir}"]`); if(nl) nl.focus(); } return; }
-  const rm=e.target.closest('.rm'); if(rm){ const li=rm.closest('li'); const d=plan.days[+li.dataset.day]; if(!d||!d.items[+li.dataset.idx]) return; snapshot(); d.items.splice(+li.dataset.idx,1); save(); render(); }
+  const rm=e.target.closest('.rm'); if(rm){ const li=rm.closest('li'); const d=plan.days[+li.dataset.day]; if(!d||!d.items[+li.dataset.idx]) return; snapshot(); onStopRemoved(d,+li.dataset.idx); d.items.splice(+li.dataset.idx,1); save(); render(); return; }
+  const bx=e.target.closest('.bx'); if(bx){ const li=bx.closest('li'); const d=plan.days[+li.dataset.day]; if(!d) return; const k=d.bridges.findIndex(b=>b.id===li.dataset.bid); if(k<0) return; snapshot(); d.bridges.splice(k,1); save(); render(); return; }
+  const bb=e.target.closest('.brbtn'); if(bb){ openBridge(+bb.dataset.day); return; }
 });
 document.getElementById('days').addEventListener('change',e=>{
+  const bd=e.target.closest('.bdone'); if(bd){ const li=bd.closest('li'); const d=plan.days[+li.dataset.day]; const b=d&&d.bridges.find(x=>x.id===li.dataset.bid); if(!b) return; b.done=bd.checked; b.doneAt=bd.checked?Date.now():undefined; li.classList.toggle('done',bd.checked); save(); return; }
   const tin=e.target.closest('.tin'); if(!tin) return;
   const li=tin.closest('li'); const d=plan.days[+li.dataset.day]; const it=d&&d.items[+li.dataset.idx]; if(!it) return;
   snapshot(); it.t=tin.value; sortDay(d); save(); render();
@@ -1757,9 +1849,9 @@ document.getElementById('chips').onclick=e=>{const b=e.target.closest('.chip'); 
 
 function openSheet(){ sheet.hidden=false; scrim.hidden=false; fab.hidden=true; if(!log.children.length){ if(!loadChat()) hello(); } setTimeout(()=>q.focus(),50); }
 function closeSheet(){ sheet.hidden=true; scrim.hidden=true; fab.hidden=false; fab.focus(); }
-fab.onclick=openSheet; document.getElementById('close').onclick=closeSheet; scrim.onclick=()=>{ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); };
+fab.onclick=openSheet; document.getElementById('close').onclick=closeSheet; scrim.onclick=()=>{ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); if(!bridgesheet.hidden) closeBridge(); };
 document.getElementById('fnLink').onclick=()=>closeSheet();
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); if(!bridgesheet.hidden) closeBridge(); } });
 
 function bubble(cls,html){ const d=document.createElement('div'); d.className='msg '+cls; d.innerHTML=html; log.appendChild(d); log.scrollTop=log.scrollHeight; return d; }
 function md(s){
@@ -1927,13 +2019,13 @@ async function apiChat(msgs, opts){
 }
 
 function compactPlan(){
-  return JSON.stringify({trip:plan.trip, days:plan.days.map((d,i)=>({day:i+1,title:d.title,macau:!!d.macau,key:d.key&&d.key.name,load:(L=>`${L.count}곳 · 약 ${fmtMin(L.total)}${L.walk>0?' · 도보 '+L.walk.toFixed(1)+'km':''}`)(dayLoad(d)),warn:loadWarning(d)||undefined,items:d.items.map((it,j)=>({id:it.id,idx:j+1,t:it.t,n:it.n,dur:durOf(it)}))}))});
+  return JSON.stringify({trip:plan.trip, days:plan.days.map((d,i)=>({day:i+1,title:d.title,macau:!!d.macau,key:d.key&&d.key.name,load:(L=>`${L.count}곳 · 약 ${fmtMin(L.total)}${L.walk>0?' · 도보 '+L.walk.toFixed(1)+'km':''}`)(dayLoad(d)),warn:loadWarning(d)||undefined,items:d.items.map((it,j)=>({id:it.id,idx:j+1,t:it.t,n:it.n,dur:durOf(it)})),bridges:d.bridges.length?d.bridges.map(b=>({id:b.id,after:b.after,text:b.text,done:!!b.done})):undefined}))});
 }
 const RULES=()=>`너는 "토끼"야. ${travelerName()?`여행자 이름은 "${travelerName()}"이고, `:""}엄마와 딸의 홍콩·마카오 3박 4일 여행을 돕는 다정하고 센스 있는 토끼 여행 도우미야. 자신을 부를 땐 "토끼"라고 해.
 ${tripBrief()} 날짜·항공편·숙소가 미정이면 사용자가 알려줄 때 set_trip_info로 적어 줘.
 [주요 주제] 호텔, 경로, 명소, 항공권, 요즘 여행 핫 키워드.
 [답변 규칙] 한국어 존댓말, 휴대폰 화면 기준 짧게(최대 10줄 안팎), 필요하면 '- ' 목록. 실시간 검색을 못 하니 가격·운항편·영업시간·최신 트렌드는 '최근 기준 확인 필요'라고 짧게 밝혀. 모르는 건 지어내지 마. 토끼다운 말투는 한 답변에 한 번 정도만 살짝(예: 깡총).
-[일정 반영] 사용자가 넣어줘/바꿔줘/빼줘/옮겨줘처럼 일정 변경을 요청할 때만 도구를 써. 장소를 고치거나 뺄 땐 현재 일정 JSON의 id를 stop_id로 넘겨(순번은 변경 뒤 바뀔 수 있어). 도구가 돌려준 items가 최신 상태야. 각 Day의 load는 머무는 시간과 이동을 더한 대략값, warn이 있으면 그날이 빡빡하다는 뜻이니 덜어 내기를 먼저 제안해. 순서만 바꿀 땐 reorder_stops, 시간을 바꿀 땐 update_stop. 장소를 넣을 땐 실제 위치에 가까운 위도·경도와 구글지도 검색어(영문)를 함께 넣고, 하루 핵심 1곳 원칙이 깨지지 않게 해. 변경 후엔 무엇을 바꿨는지 한두 줄로 알려줘.${toolsOK?'':' (이번 화면에선 일정 직접 수정이 안 되니, 바꿀 내용을 말로만 제안해.)'}
+[일정 반영] 사용자가 넣어줘/바꿔줘/빼줘/옮겨줘처럼 일정 변경을 요청할 때만 도구를 써. 장소를 고치거나 뺄 땐 현재 일정 JSON의 id를 stop_id로 넘겨(순번은 변경 뒤 바뀔 수 있어). 도구가 돌려준 items가 최신 상태야. 각 Day의 load는 머무는 시간과 이동을 더한 대략값, warn이 있으면 그날이 빡빡하다는 뜻이니 덜어 내기를 먼저 제안해. 순서만 바꿀 땐 reorder_stops, 시간을 바꿀 땐 update_stop. 동행을 배려하는 따뜻한 한 줄(비타민, 컨디션 확인, 쉬어 가기)은 add_bridge로 일정 사이에 끼워 넣을 수 있어. 사용자가 원하거나 일정이 빡빡할 때 한두 개만 제안해. 장소를 넣을 땐 실제 위치에 가까운 위도·경도와 구글지도 검색어(영문)를 함께 넣고, 하루 핵심 1곳 원칙이 깨지지 않게 해. 변경 후엔 무엇을 바꿨는지 한두 줄로 알려줘.${toolsOK?'':' (이번 화면에선 일정 직접 수정이 안 되니, 바꿀 내용을 말로만 제안해.)'}
 [여정 선택] 상단에 여정 선택지가 있어: U=당신의 여정(사용자가 직접 꾸미는 일정), A=첫 번째 여정(현재 여정), B=두 번째 여정(조금 다른 여정), C=세 번째 여정(다른 여정). 지금 선택된 여정은 "${currentMeta().ord} · ${currentMeta().name}"이야. 사용자가 다른 여정으로 바꿔 달라고 하면 choose_plan 도구를 써. 일정 변경 도구는 항상 지금 선택된 여정에만 적용돼.
 [운영 정보] 각 장소의 영업시간·요금은 페이지에 저장된 참고값(기준일 ${INFO_ASOF})이야. 사용자가 "○○ 영업시간/요금/휴무를 △△로 바꿔줘"라고 알려주면 update_info 도구로 고쳐. 네가 아는 값으로 임의로 고치지는 마.
 [현재 일정 JSON]
@@ -1953,7 +2045,7 @@ const TOOLS=[
     d.items.push(it); sortDay(d); save(); render(); return {ok:true,day:Number(i.day),stop_id:it.id,position:d.items.indexOf(it)+1,items:daySummary(d)}; }},
  {name:"remove_stop",description:"장소를 삭제해. stop_id(현재 일정 JSON의 id)로 지정하는 것이 정확해. 없으면 day+idx. 반환: 삭제한 장소명과 그날 목록.",
   inputSchema:{type:"object",properties:{stop_id:{type:"string"},day:{type:"integer"},idx:{type:"integer"}}},
-  execute(i){ const pos=locateStop(i); snapshot(); const [r]=pos.d.items.splice(pos.k,1); save(); render(); return {removed:r.n,items:daySummary(pos.d)}; }},
+  execute(i){ const pos=locateStop(i); snapshot(); onStopRemoved(pos.d,pos.k); const [r]=pos.d.items.splice(pos.k,1); save(); render(); return {removed:r.n,items:daySummary(pos.d)}; }},
  {name:"update_stop",description:"장소의 시간, 이름, 이유, 메모, 핵심 여부를 수정해. stop_id(현재 일정 JSON의 id)로 지정하는 것이 정확해. 없으면 day+idx. 바꿀 필드만 보내. 반환: 그날 목록.",
   inputSchema:{type:"object",properties:{stop_id:{type:"string"},day:{type:"integer"},idx:{type:"integer"},time:{type:"string"},name:{type:"string"},why:{type:"string"},note:{type:"string"},is_key:{type:"boolean"},dur:{type:"integer",description:"머무는 시간(분)"}}},
   execute(i){ const pos=locateStop(i), it=pos.it, d=pos.d; snapshot();
@@ -1962,6 +2054,12 @@ const TOOLS=[
  {name:"reorder_stops",description:"한 Day 안에서 장소 순서를 바꿔. 시간 칸은 그대로 두고 장소만 자리를 바꾼다(첫 시간에 첫 id, 둘째 시간에 둘째 id…). stop_ids는 그날 장소 id 전체를 원하는 순서로. 반환: 그날 목록.",
   inputSchema:{type:"object",properties:{day:{type:"integer"},stop_ids:{type:"array",items:{type:"string"}}},required:["day","stop_ids"]},
   execute(i){ const d=plan.days[dayIdx(i.day)]; const ids=(Array.isArray(i.stop_ids)?i.stop_ids:[]).map(String); snapshot(); reorderStops(d,ids); save(); render(); return {ok:true,items:daySummary(d)}; }},
+ {name:"add_bridge",description:"일정 사이에 따뜻한 챙김 메모(체크포인트)를 끼워 넣어. 예: 비타민 챙겨 먹기, 엄마 컨디션 확인하기, 쉬어 가기. after_id는 그 뒤에 둘 장소 id, 없으면 그날 맨 처음. 반환: 메모 id와 그날 메모 목록.",
+  inputSchema:{type:"object",properties:{day:{type:"integer"},text:{type:"string"},after_id:{type:"string"}},required:["day","text"]},
+  execute(i){ const d=plan.days[dayIdx(i.day)]; const text=String(i.text||"").trim().slice(0,60); if(!text) throw new Error("문구가 비었어요"); let after=null; if(i.after_id){ const pos=stopById(String(i.after_id)); if(!pos||pos.d!==d) throw new Error("after_id가 그날의 장소가 아니에요"); after=pos.it.id; } snapshot(); const b={id:newId(),after,text,done:false}; d.bridges.push(b); save(); render(); return {ok:true,bridge_id:b.id,bridges:d.bridges.map(x=>({id:x.id,after:x.after,text:x.text}))}; }},
+ {name:"remove_bridge",description:"챙김 메모를 빼. 반환: 뺀 문구.",
+  inputSchema:{type:"object",properties:{bridge_id:{type:"string"}},required:["bridge_id"]},
+  execute(i){ for(const d of plan.days){ const k=d.bridges.findIndex(b=>b.id===String(i.bridge_id)); if(k>=0){ snapshot(); const [b]=d.bridges.splice(k,1); save(); render(); return {removed:b.text}; } } throw new Error("그 id의 메모가 없어요"); }},
  {name:"swap_days",description:"두 Day의 일정을 통째로 맞바꿔. 마카오 날짜를 옮길 때 사용. 반환: 바뀐 Day 순서.",
   inputSchema:{type:"object",properties:{a:{type:"integer"},b:{type:"integer"}},required:["a","b"]},
   execute(i){ const a=dayIdx(i.a), b=dayIdx(i.b); snapshot(); [plan.days[a],plan.days[b]]=[plan.days[b],plan.days[a]];
