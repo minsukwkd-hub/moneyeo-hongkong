@@ -928,6 +928,10 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
     <button class="ghost" id="undo" type="button" disabled>방금 변경 되돌리기</button>
     <button class="ghost" id="reset" type="button">처음 일정으로</button>
     <span id="resetConfirm" hidden><button class="ghost" id="resetYes" type="button" style="color:var(--pin)">네, 초기화</button> <button class="ghost" id="resetNo" type="button">취소</button></span>
+    <button class="ghost" id="exportBtn" type="button">여정 내보내기</button>
+    <button class="ghost" id="importBtn" type="button">여정 불러오기</button><input type="file" id="importFile" accept="application/json,.json" hidden>
+    <span id="importConfirm" hidden><button class="ghost" id="importYes" type="button" style="color:var(--pin)">네, 당신의 여정을 덮어쓰기</button> <button class="ghost" id="importNo" type="button">취소</button></span>
+    <span id="ioMsg" class="hint" hidden></span>
   </div>
 </section>
 
@@ -1467,6 +1471,57 @@ document.getElementById('undo').onclick=()=>{ if(!history.length) return; plan=n
 document.getElementById('reset').onclick=()=>{ document.getElementById('resetConfirm').hidden=false; };
 document.getElementById('resetNo').onclick=()=>{ document.getElementById('resetConfirm').hidden=true; };
 document.getElementById('resetYes').onclick=()=>{ snapshot(); INFO_EDIT={}; saveInfoEdit(); plan=repo.fresh(variant); save(); render(); document.getElementById('resetConfirm').hidden=true; };
+
+// ---- 내보내기 / 불러오기 (M1b): 여정 JSON 파일. 사진은 M3에서 별도. 불러온 여정은 항상 "당신의 여정"으로 들어간다 ----
+function ioMsg(t){ const el=document.getElementById('ioMsg'); el.textContent=t||''; el.hidden=!t; if(t) setTimeout(()=>{ if(el.textContent===t){ el.hidden=true; } },6000); }
+function downloadBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); }
+async function exportDoc(){
+  const meta=currentMeta();
+  const doc={kind:"tokki-trip",v:DOC_V,exportedAt:new Date().toISOString(),tripId:variant,title:meta.ord+" · "+meta.name,owner:travelerName()||undefined,data:plan};
+  const name=`토끼의여정-${variant}-${new Date().toISOString().slice(0,10)}.json`;
+  const blob=new Blob([JSON.stringify(doc,null,1)],{type:"application/json"});
+  try{
+    const file=new File([blob],name,{type:"application/json"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:name}); ioMsg('여정 파일을 보냈어요'); return; }
+  }catch(e){ if(e&&e.name==="AbortError") return; }
+  downloadBlob(blob,name); ioMsg('여정 파일을 내려받았어요');
+}
+// 불러온 내용은 신뢰하지 않는다: 글자 길이·좌표 범위·개수 상한 (설계 2.9)
+function validateDoc(p){
+  const S=(v,n)=>String(v==null?"":v).replace(/[\u0000-\u001f]/g,"").slice(0,n);
+  if(!p||typeof p!=="object"||!Array.isArray(p.days)||!p.days.length) throw new Error("여정 파일이 아니에요");
+  const out={trip:{},days:[]};
+  const t=p.trip&&typeof p.trip==="object"?p.trip:{};
+  out.trip.dates=typeof t.dates==="string"?{label:S(t.dates,60)}:{label:S(t.dates&&t.dates.label,60),start:t.dates&&t.dates.start?S(t.dates.start,10):undefined,end:t.dates&&t.dates.end?S(t.dates.end,10):undefined};
+  const fl=t.flights&&typeof t.flights==="object"?t.flights:{};
+  out.trip.flights={in:fl.in&&fl.in.code?{code:S(fl.in.code,20)}:(t.flightIn?{code:S(t.flightIn,20)}:null),out:fl.out&&fl.out.code?{code:S(fl.out.code,20)}:(t.flightOut?{code:S(t.flightOut,20)}:null)};
+  if(t.macau) out.trip.macau=S(t.macau,30);
+  if(t.party&&typeof t.party==="object") out.trip.party={type:S(t.party.type,10)||"모녀"};
+  out.days=p.days.slice(0,30).map(d=>{ d=d&&typeof d==="object"?d:{};
+    const items=(Array.isArray(d.items)?d.items:[]).filter(it=>it&&typeof it==="object"&&isFinite(+it.lat)&&isFinite(+it.lng)&&Math.abs(+it.lat)<=90&&Math.abs(+it.lng)<=180).slice(0,50)
+      .map(it=>({t:S(it.t,5),n:S(it.n,80),q:S(it.q||it.n,120),lat:+it.lat,lng:+it.lng,why:S(it.why,500),note:it.note?S(it.note,500):undefined,key:!!it.key,hotel:it.hotel?true:undefined,origin:["me","suzi","template"].includes(it.origin)?it.origin:"me"}));
+    const bridges=(Array.isArray(d.bridges)?d.bridges:[]).slice(0,30).map(b=>({after:b&&b.after?S(b.after,16):null,text:S(b&&b.text,120),done:!!(b&&b.done)}));
+    return {title:S(d.title,80)||"",sub:d.sub?S(d.sub,120):undefined,macau:d.macau?true:undefined,items,bridges};
+  });
+  return normalizeDoc(out);
+}
+let importPending=null;
+document.getElementById('exportBtn').onclick=()=>{ exportDoc(); };
+document.getElementById('importBtn').onclick=()=>{ document.getElementById('importFile').click(); };
+function applyImport(doc){ repo.save('U', doc); importPending=null; document.getElementById('importConfirm').hidden=true; variant='U'; plan=repo.load('U'); history=[]; document.getElementById('undo').disabled=true; save(); render(); ioMsg('"당신의 여정"으로 불러왔어요'); const sec=document.getElementById('d1'); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'}); }
+document.getElementById('importFile').onchange=async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
+  if(f.size>2*1024*1024){ ioMsg('파일이 너무 커요 (2MB 이하)'); return; }
+  let j=null; try{ j=JSON.parse(await f.text()); }catch(err){ ioMsg('JSON 파일을 읽지 못했어요'); return; }
+  const raw=j&&j.kind==="tokki-trip"?j.data:j; let doc;
+  try{ doc=validateDoc(raw); }catch(err){ ioMsg(err.message||'여정 파일이 아니에요'); return; }
+  doc.importedFrom={title:String(j&&j.title||f.name).slice(0,80),owner:j&&j.owner?String(j.owner).slice(0,20):undefined,at:Date.now()};
+  const cur=loadPlan('U'), filled=cur.days.reduce((n,d)=>n+d.items.filter(x=>!x.hotel).length,0);
+  if(filled<=4){ applyImport(doc); return; }
+  importPending=doc; document.getElementById('importConfirm').hidden=false; ioMsg('');
+};
+document.getElementById('importYes').onclick=()=>{ if(importPending) applyImport(importPending); };
+document.getElementById('importNo').onclick=()=>{ importPending=null; document.getElementById('importConfirm').hidden=true; };
 
 // ---- 여정 고르기 ----
 document.getElementById('picker').onclick=e=>{ const b=e.target.closest('.pick'); if(b) switchPlan(b.dataset.id); };
