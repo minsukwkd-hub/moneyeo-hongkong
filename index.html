@@ -847,6 +847,20 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
 .tl li.bridge.done .bl span{text-decoration:line-through;color:var(--muted)}
 .tl li.bridge .bx{border:0;background:none;font-size:18px;line-height:1;color:var(--muted);cursor:pointer;padding:0 2px}
 .bpresets{display:flex;gap:6px;flex-wrap:wrap}
+.media{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px}
+.media .th{width:56px;height:56px;border-radius:8px;border:1px solid var(--line);background:var(--surface);padding:0;overflow:hidden;position:relative;cursor:pointer}
+.media .th img{width:100%;height:100%;object-fit:cover;display:block}
+.media .th.v::after{content:"▶";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.media .th.noimg{display:flex;align-items:center;justify-content:center;font-size:20px}
+.media .madd{width:56px;height:56px;border:1px dashed var(--line);background:none;border-radius:8px;font:inherit;font-size:11px;line-height:1.2;color:var(--muted);cursor:pointer}
+.mediaview{position:fixed;inset:0;z-index:45;background:#000;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.mediaview .mh{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;color:#fff;font-size:14px}
+.mediaview .mh .x{color:#fff;border-color:rgba(255,255,255,.4);background:none}
+.mediaview .mb{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.mediaview img,.mediaview video{max-width:100%;max-height:100%;object-fit:contain}
+.mediaview .mf{display:flex;gap:10px;justify-content:center;padding:10px 16px}
+.mediaview .ghost{color:#fff;border-color:rgba(255,255,255,.4);background:none}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;z-index:50;pointer-events:none;max-width:90vw;text-align:center}
 .callout.warn{border-left-color:var(--pin)}
 .callout.warn b{color:var(--pin)}
 .rm{border:0;background:none;color:var(--pin);font-size:12.5px;cursor:pointer;padding:0;font-weight:700}
@@ -968,6 +982,13 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
   <span class="face"><svg style="color:#13231f" aria-hidden="true"><use href="#rabbit"/></svg></span>물어보기
 </button>
 
+<input type="file" id="mediaFile" accept="image/*,video/*" multiple hidden>
+<div class="mediaview" id="mediaview" role="dialog" aria-modal="true" aria-label="사진·영상 보기" hidden>
+  <div class="mh"><span id="mvTitle"></span><button class="x" id="mvClose" type="button" aria-label="닫기">×</button></div>
+  <div class="mb" id="mvBody"></div>
+  <div class="mf"><button class="ghost" id="mvDel" type="button">이 사진·영상 지우기</button><span id="mvDelConfirm" hidden><button class="ghost" id="mvDelYes" type="button" style="color:#ff8a80">네, 지우기</button> <button class="ghost" id="mvDelNo" type="button">취소</button></span></div>
+</div>
+<div class="toast" id="toast" hidden></div>
 <div class="bigwrap" id="bigwrap" role="dialog" aria-modal="true" aria-labelledby="bigTitle" hidden>
   <div class="bighead"><h2 id="bigTitle">지도</h2><button class="x" id="bigClose" type="button" aria-label="지도 닫기">×</button></div>
   <div id="big"></div>
@@ -1487,7 +1508,7 @@ function reorderStops(d,ids){
   const cur=d.items.map(x=>x.id); if(ids.length!==cur.length||new Set(ids).size!==ids.length||!ids.every(id=>cur.includes(id))) throw new Error("stop_ids는 그날의 장소 id 전체를 한 번씩, 원하는 순서로 담아야 해요");
   const times=d.items.map(x=>x.t), byId=new Map(d.items.map(x=>[x.id,x])); d.items=ids.map(id=>byId.get(id)); d.items.forEach((x,i)=>{ x.t=times[i]; });
 }
-function switchPlan(id){ if(!metaOf(id)) return; if(id!==variant){ variant=id; plan=loadPlan(id); history=[]; document.getElementById('undo').disabled=true; } save(); render(); }
+function switchPlan(id){ if(!metaOf(id)) return; const changed=id!==variant; if(changed){ variant=id; plan=loadPlan(id); history=[]; document.getElementById('undo').disabled=true; } save(); render(); if(changed&&typeof loadMediaIndex==='function') loadMediaIndex().then(paintMedia); }
 function sortDay(d){ d.items.sort((a,b)=>String(a.t).localeCompare(String(b.t))); }
 function isMacauPt(p){ return isFinite(p.lng)&&p.lng<113.75; }
 function snapshot(){ history.push(JSON.stringify(plan)); if(history.length>15) history.shift(); document.getElementById('undo').disabled=false; }
@@ -1607,7 +1628,7 @@ function render(){
       li.dataset.day=di; li.dataset.idx=ii;
       const tag=added?`<span class="tag">${it.origin==='me'?'직접 추가':'토끼 추가'}</span>`:'';
       const tcell=custom?`<div class="t"><input type="time" class="tin" value="${esc(it.t||'')}" aria-label="시간"></div>`:`<div class="t">${esc(it.t||'')}</div>`;
-      li.innerHTML=`${tcell}<div class="c"><div class="name"><span class="pn">${ii+1}</span><button class="nm" type="button" aria-label="${esc(it.n)} 정보 보기">${esc(it.n)}${tag}</button></div><p class="why">${esc(it.why||'')}</p>${it.note?`<p class="note">${esc(it.note)}</p>`:''}<div class="act"><a class="gm" href="${gm(it.q||it.n)}" target="_blank" rel="noopener">구글 지도에서 열기 ↗</a>${custom?`<button class="mv" type="button" data-dir="-1" aria-label="위로" ${ii===0?'disabled':''}>▲</button><button class="mv" type="button" data-dir="1" aria-label="아래로" ${ii===d.items.length-1?'disabled':''}>▼</button><button class="rm" type="button">빼기</button>`:''}</div></div>`;
+      li.innerHTML=`${tcell}<div class="c"><div class="name"><span class="pn">${ii+1}</span><button class="nm" type="button" aria-label="${esc(it.n)} 정보 보기">${esc(it.n)}${tag}</button></div><p class="why">${esc(it.why||'')}</p>${it.note?`<p class="note">${esc(it.note)}</p>`:''}<div class="act"><a class="gm" href="${gm(it.q||it.n)}" target="_blank" rel="noopener">구글 지도에서 열기 ↗</a>${custom?`<button class="mv" type="button" data-dir="-1" aria-label="위로" ${ii===0?'disabled':''}>▲</button><button class="mv" type="button" data-dir="1" aria-label="아래로" ${ii===d.items.length-1?'disabled':''}>▼</button><button class="rm" type="button">빼기</button>`:''}</div><div class="media" data-stop="${esc(it.id)}"></div></div>`;
       ol.appendChild(li);
       bridgesAt(d,it.id).forEach(b=>ol.appendChild(bridgeLi(b)));
       const nx=d.items[ii+1]; if(nx){ const tr=travelBetween(it,nx); if(tr&&tr.label){ const g=document.createElement('li'); g.className='gap'+(custom?' ed':''); g.setAttribute('aria-hidden','true'); g.innerHTML=`<div class="t"></div><div class="c">↓ ${esc(tr.label)}</div>`; ol.appendChild(g); } }
@@ -1625,6 +1646,7 @@ function render(){
   mount('ov',document.getElementById('map-overview'),{pins:ov,fit:[[22.09,113.50],[22.36,114.24]],
     lines:[[[22.2885,114.1505],[22.282,114.10],[22.255,114.02],[22.235,113.86],[22.205,113.66],[22.1975,113.5605]],[[22.3080,113.9185],[22.325,113.985],[22.322,114.06],[22.305,114.135],[22.2849,114.1582]]],
     extra:[{lat:22.24,lng:113.78,html:'<span class="lbl sea" style="font-size:11px">마카오 페리 약 1시간</span>'},{lat:22.338,lng:114.02,html:'<span class="lbl sea" style="font-size:11px">공항철도 24분</span>'}]});
+  paintMedia();
 }
 
 (function routeMap(){
@@ -1696,6 +1718,72 @@ document.getElementById('importFile').onchange=async e=>{
 };
 document.getElementById('importYes').onclick=()=>{ if(importPending) applyImport(importPending); };
 document.getElementById('importNo').onclick=()=>{ importPending=null; document.getElementById('importConfirm').hidden=true; };
+
+// ---- 사진·영상 (M3): 기기 안 IndexedDB에만 저장. 공유 링크·내보내기 파일에는 실리지 않는다 ----
+const MDB={db:null};
+function mdbOpen(){ return new Promise((res,rej)=>{ if(MDB.db) return res(MDB.db); if(!window.indexedDB) return rej(new Error("이 브라우저는 사진 저장을 지원하지 않아요")); const rq=indexedDB.open("tokki",1);
+  rq.onupgradeneeded=()=>{ const db=rq.result; if(!db.objectStoreNames.contains('media')){ const st=db.createObjectStore('media',{keyPath:'id'}); st.createIndex('stop','stopId'); st.createIndex('trip','tripId'); } };
+  rq.onsuccess=()=>{ MDB.db=rq.result; MDB.db.onversionchange=()=>{ try{ MDB.db.close(); }catch(e){} MDB.db=null; }; res(MDB.db); };
+  rq.onerror=()=>rej(rq.error||new Error("사진 저장소를 열지 못했어요")); rq.onblocked=()=>rej(new Error("다른 탭이 사진 저장소를 쓰고 있어요")); }); }
+function mdbTx(mode,fn){ return mdbOpen().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('media',mode); let rq=null; try{ rq=fn(tx.objectStore('media')); }catch(e){ rej(e); return; } tx.oncomplete=()=>res(rq&&('result' in rq)?rq.result:undefined); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); })); }
+const media={ put:rec=>mdbTx('readwrite',st=>st.put(rec)), del:id=>mdbTx('readwrite',st=>st.delete(id)), get:id=>mdbTx('readonly',st=>st.get(id)), byTrip:tripId=>mdbTx('readonly',st=>st.index('trip').getAll(tripId)) };
+var MEDIA_IDX={}; // stopId -> [{id,kind,url(썸네일)}]
+function freeMediaIdx(){ Object.values(MEDIA_IDX).flat().forEach(m=>{ if(m.url) try{ URL.revokeObjectURL(m.url); }catch(e){} }); MEDIA_IDX={}; }
+async function loadMediaIndex(){ freeMediaIdx(); try{ const all=await media.byTrip(variant); (all||[]).sort((a,b)=>a.createdAt-b.createdAt).forEach(r=>{ (MEDIA_IDX[r.stopId]=MEDIA_IDX[r.stopId]||[]).push({id:r.id,kind:r.kind,url:r.thumb?URL.createObjectURL(r.thumb):null}); }); }catch(e){ MEDIA_IDX={}; } }
+function paintMedia(){ const IDX=(typeof MEDIA_IDX==='object'&&MEDIA_IDX)||{}; document.querySelectorAll('.media[data-stop]').forEach(el=>{ const list=IDX[el.dataset.stop]||[]; el.innerHTML=list.map(m=>`<button class="th ${m.kind==='video'?'v':''} ${m.url?'':'noimg'}" type="button" data-mid="${esc(m.id)}" aria-label="${m.kind==='video'?'영상':'사진'} 보기">${m.url?`<img src="${m.url}" alt="">`:(m.kind==='video'?'🎞':'🖼')}</button>`).join('')+`<button class="madd" type="button" aria-label="사진·영상 붙이기">＋ 사진<br>영상</button>`; }); }
+function toast(t){ const el=document.getElementById('toast'); el.textContent=t; el.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>{ el.hidden=true; },3500); }
+async function shrinkImage(file,maxEdge,quality){
+  let bmp=null; try{ bmp=await createImageBitmap(file,{imageOrientation:'from-image'}); }catch(e){ try{ bmp=await createImageBitmap(file); }catch(e2){ bmp=null; } }
+  if(!bmp){ const url=URL.createObjectURL(file); try{ bmp=await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error("decode")); im.src=url; }); }finally{ setTimeout(()=>URL.revokeObjectURL(url),1000); } }
+  const w0=bmp.width||bmp.naturalWidth, h0=bmp.height||bmp.naturalHeight; const sc=Math.min(1,maxEdge/Math.max(w0,h0)); const w=Math.max(1,Math.round(w0*sc)), h=Math.max(1,Math.round(h0*sc));
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(bmp,0,0,w,h); if(bmp.close) bmp.close();
+  const blob=await new Promise(res=>cv.toBlob(res,'image/jpeg',quality)); if(!blob) throw new Error("encode"); return {blob,w,h};
+}
+async function videoPoster(file){
+  const url=URL.createObjectURL(file);
+  try{ return await new Promise((res,rej)=>{ const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.preload='metadata'; const to=setTimeout(()=>rej(new Error("timeout")),6000);
+    v.onloadeddata=()=>{ try{ v.currentTime=Math.min(0.5,(v.duration||1)/2); }catch(e){} };
+    v.onseeked=()=>{ try{ const sc=Math.min(1,320/Math.max(v.videoWidth,v.videoHeight)); const cv=document.createElement('canvas'); cv.width=Math.max(1,Math.round(v.videoWidth*sc)); cv.height=Math.max(1,Math.round(v.videoHeight*sc)); cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height); cv.toBlob(b=>{ clearTimeout(to); b?res({blob:b,w:v.videoWidth,h:v.videoHeight,dur:v.duration}):rej(new Error("poster")); },'image/jpeg',0.8); }catch(e){ clearTimeout(to); rej(e); } };
+    v.onerror=()=>{ clearTimeout(to); rej(new Error("video")); }; v.src=url; }); }
+  finally{ setTimeout(()=>URL.revokeObjectURL(url),2000); }
+}
+let mediaTarget=null;
+const VIDEO_MAX=80*1024*1024;
+async function addMediaFiles(files){
+  if(!mediaTarget) return; const {stopId,dayId}=mediaTarget; let ok=0, skipped=[];
+  try{ if(navigator.storage&&navigator.storage.persist&&!SETTINGS.persisted){ SETTINGS.persisted=!!(await navigator.storage.persist()); saveSettings(); } }catch(e){}
+  for(const f of files){
+    try{
+      const rec={id:newId(),tripId:variant,dayId,stopId,mime:f.type||'',size:f.size,name:(f.name||'').slice(0,80),createdAt:Date.now()};
+      if((f.type||'').startsWith('video/')){ if(f.size>VIDEO_MAX){ skipped.push(`${f.name||'영상'}: 80MB를 넘어요`); continue; } rec.kind='video'; rec.blob=f; try{ const ps=await videoPoster(f); rec.thumb=ps.blob; rec.w=ps.w; rec.h=ps.h; rec.dur=ps.dur; }catch(e){ rec.thumb=null; } }
+      else { rec.kind='image'; try{ const big=await shrinkImage(f,2048,0.82); const th=await shrinkImage(f,320,0.8); rec.blob=big.blob; rec.thumb=th.blob; rec.w=big.w; rec.h=big.h; rec.mime='image/jpeg'; }catch(e){ if(f.size>40*1024*1024){ skipped.push(`${f.name||'사진'}: 너무 커요`); continue; } rec.blob=f; rec.thumb=null; } }
+      await media.put(rec); (MEDIA_IDX[stopId]=MEDIA_IDX[stopId]||[]).push({id:rec.id,kind:rec.kind,url:rec.thumb?URL.createObjectURL(rec.thumb):null}); ok++;
+    }catch(e){ skipped.push(`${f.name||'파일'}: 저장 실패`); }
+  }
+  paintMedia();
+  let room=''; try{ if(navigator.storage&&navigator.storage.estimate){ const est=await navigator.storage.estimate(); if(est.quota) room=` · 남은 공간 약 ${((est.quota-(est.usage||0))/1073741824).toFixed(1)}GB`; } }catch(e){}
+  toast((ok?`${ok}개 저장했어요 (이 기기에만)`:'저장한 파일이 없어요')+(skipped.length?` · 건너뜀 ${skipped.length}개`:'')+room);
+  if(skipped.length) console.warn('media skipped', skipped);
+}
+document.getElementById('mediaFile').onchange=e=>{ const fs=[...(e.target.files||[])]; e.target.value=''; if(fs.length) addMediaFiles(fs); };
+document.getElementById('days').addEventListener('click',e=>{
+  const add=e.target.closest('.madd'); if(add){ const wrap=add.closest('.media'); const li=add.closest('li'); const d=plan.days[+li.dataset.day]; mediaTarget={stopId:wrap.dataset.stop,dayId:d?d.id:null}; document.getElementById('mediaFile').click(); return; }
+  const th=e.target.closest('.th'); if(th){ openMedia(th.dataset.mid, th.closest('.media').dataset.stop); }
+});
+const mediaview=document.getElementById('mediaview'); let mvCur=null, mvURL=null;
+async function openMedia(id,stopId){
+  let rec=null; try{ rec=await media.get(id); }catch(e){} if(!rec){ toast('파일을 찾지 못했어요'); return; }
+  mvCur={id,stopId}; if(mvURL){ URL.revokeObjectURL(mvURL); mvURL=null; } mvURL=URL.createObjectURL(rec.blob);
+  const pos=stopById(stopId); const when=new Date(rec.createdAt); document.getElementById('mvTitle').textContent=`${pos?pos.it.n:''} · ${when.getMonth()+1}/${when.getDate()} ${String(when.getHours()).padStart(2,'0')}:${String(when.getMinutes()).padStart(2,'0')}`;
+  const body=document.getElementById('mvBody'); body.innerHTML=''; if(rec.kind==='video'){ const v=document.createElement('video'); v.src=mvURL; v.controls=true; v.playsInline=true; v.setAttribute('playsinline',''); body.appendChild(v); } else { const im=document.createElement('img'); im.src=mvURL; im.alt=''; body.appendChild(im); }
+  document.getElementById('mvDelConfirm').hidden=true; document.getElementById('mvDel').hidden=false; mediaview.hidden=false; document.body.style.overflow='hidden';
+}
+function closeMedia(){ mediaview.hidden=true; document.body.style.overflow=''; document.getElementById('mvBody').innerHTML=''; if(mvURL){ URL.revokeObjectURL(mvURL); mvURL=null; } mvCur=null; }
+document.getElementById('mvClose').onclick=closeMedia;
+document.getElementById('mvDel').onclick=()=>{ document.getElementById('mvDelConfirm').hidden=false; document.getElementById('mvDel').hidden=true; };
+document.getElementById('mvDelNo').onclick=()=>{ document.getElementById('mvDelConfirm').hidden=true; document.getElementById('mvDel').hidden=false; };
+document.getElementById('mvDelYes').onclick=async()=>{ if(!mvCur) return; try{ await media.del(mvCur.id); const list=MEDIA_IDX[mvCur.stopId]||[]; const k=list.findIndex(m=>m.id===mvCur.id); if(k>=0){ if(list[k].url) URL.revokeObjectURL(list[k].url); list.splice(k,1); } paintMedia(); closeMedia(); toast('지웠어요'); }catch(e){ toast('지우지 못했어요'); } };
+loadMediaIndex().then(paintMedia);
 
 // ---- 챙김 메모 시트 (M2c) ----
 const bridgesheet=document.getElementById('bridgesheet'); let bridgeDay=0;
@@ -1854,7 +1942,7 @@ function openSheet(){ sheet.hidden=false; scrim.hidden=false; fab.hidden=true; i
 function closeSheet(){ sheet.hidden=true; scrim.hidden=true; fab.hidden=false; fab.focus(); }
 fab.onclick=openSheet; document.getElementById('close').onclick=closeSheet; scrim.onclick=()=>{ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); if(!bridgesheet.hidden) closeBridge(); };
 document.getElementById('fnLink').onclick=()=>closeSheet();
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); if(!bridgesheet.hidden) closeBridge(); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); if(!bridgesheet.hidden) closeBridge(); if(!mediaview.hidden) closeMedia(); } });
 
 function bubble(cls,html){ const d=document.createElement('div'); d.className='msg '+cls; d.innerHTML=html; log.appendChild(d); log.scrollTop=log.scrollHeight; return d; }
 function md(s){
@@ -1890,7 +1978,7 @@ function clearChat(){ try{ localStorage.removeItem(CHAT_KEY); }catch(e){} turns=
 
 // ---- 설정(tokki-settings-v1): 여행자 이름 등. 설계 v3의 settings 자리 ----
 const SETTINGS_KEY="tokki-settings-v1";
-let SETTINGS={v:1,profile:{name:""}};
+var SETTINGS={v:1,profile:{name:""}};
 try{ const s0=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"null"); if(s0&&typeof s0==="object") SETTINGS={...SETTINGS,...s0,profile:{...SETTINGS.profile,...(s0.profile||{})}}; }catch(e){}
 function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS)); }catch(e){} }
 function travelerName(){ return String(SETTINGS.profile.name||"").replace(/[\u0000-\u001f]/g,"").trim().slice(0,20); }
