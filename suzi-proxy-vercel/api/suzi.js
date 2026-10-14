@@ -2,7 +2,8 @@
 // 환경변수(Vercel → Project → Settings → Environment Variables)
 //   ANTHROPIC_API_KEY (필수)  SUZI_TOKEN (권장)  ALLOWED_ORIGIN (권장, 예 https://minsukwkd-hub.github.io)
 //   ALLOWED_MODELS (선택, 기본 "claude-opus-5-5,claude-sonnet-5-5,claude-haiku-5-5")
-export const config = { runtime: "edge" };
+// regions: Anthropic API는 홍콩(hkg1) 발신을 403으로 막으므로 도쿄에서 실행
+export const config = { runtime: "edge", regions: ["hnd1"] };
 
 const API = "https://api.anthropic.com/v1/messages";
 const CORS = {

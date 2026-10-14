@@ -820,6 +820,9 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
 .pick.on .o{color:rgba(255,255,255,.75)}
 .pick:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .pickdesc{margin:0;font-size:13px;color:var(--muted)}
+.who{margin:0 0 6px;font-size:12px;letter-spacing:.06em;color:var(--muted)}
+.inapp{position:sticky;top:0;z-index:60;background:var(--fg);color:var(--bg);font-size:13px;line-height:1.4;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.inapp a{color:inherit;font-weight:700;white-space:nowrap}
 .linkbtn{border:0;background:none;color:var(--accent);font-weight:700;font-size:13px;cursor:pointer;padding:0}
 .linkbtn.warn{color:var(--pin)}
 /* 당신의 여정 편집 */
@@ -890,11 +893,13 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
   </symbol>
 </svg>
 
+<div class="inapp" id="inapp" hidden></div>
 <div class="wrap">
 <header class="hero">
   <svg class="bunny" style="color:var(--fg)" aria-hidden="true"><use href="#rabbit"/></svg>
+  <p class="who" id="who" hidden></p>
   <h1>엄마랑 딸,<br><span>천천히</span> 홍콩</h1>
-  <p>하루에 핵심 장소는 한 곳만. 나머지는 밥 먹고 쉬는 시간이에요. 아래에서 여정을 고르거나 "당신의 여정"에서 직접 꾸며 보세요. 궁금한 건 오른쪽 아래 SUZI에게 물어보면 일정에 바로 반영돼요.</p>
+  <p>하루에 핵심 장소는 한 곳만. 나머지는 밥 먹고 쉬는 시간이에요. 아래에서 여정을 고르거나 "당신의 여정"에서 직접 꾸며 보세요. 궁금한 건 오른쪽 아래 토끼에게 물어보면 일정에 바로 반영돼요.</p>
   <div class="pickwrap"><div class="picker" id="picker" role="group" aria-label="여정 고르기"></div><p class="pickdesc" id="pickdesc"></p></div>
   <div class="status" id="status"></div>
 </header>
@@ -928,12 +933,12 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
 
 <footer>
   <div>지도 해안선: © OpenStreetMap 기여자(ODbL), GSHHG, Natural Earth. 최근 매립지 일부는 빠져 있을 수 있어요. 정확한 길은 장소별 구글 지도 링크를 이용하세요.</div>
-  <div id="fn">* SUZI는 Claude 기반 여행 도우미예요. 실시간 웹 검색은 하지 않아서 가격, 항공 스케줄, 영업시간은 최신이 아닐 수 있어요. 예약 전에 공식 사이트에서 꼭 확인하세요. SUZI가 바꾼 일정은 지금 이 기기의 브라우저에만 저장돼요.</div>
+  <div id="fn">* 토끼 도우미는 Claude 기반이에요. 실시간 웹 검색은 하지 않아서 가격, 항공 스케줄, 영업시간은 최신이 아닐 수 있어요. 예약 전에 공식 사이트에서 꼭 확인하세요. 토끼가 바꾼 일정은 지금 이 기기의 브라우저에만 저장돼요.</div>
 </footer>
 </div>
 
-<button class="fab" id="fab" type="button" aria-label="SUZI에게 물어보기">
-  <span class="face"><svg style="color:#13231f" aria-hidden="true"><use href="#rabbit"/></svg></span>SUZI에게 물어보기
+<button class="fab" id="fab" type="button" aria-label="물어보기">
+  <span class="face"><svg style="color:#13231f" aria-hidden="true"><use href="#rabbit"/></svg></span>물어보기
 </button>
 
 <div class="bigwrap" id="bigwrap" role="dialog" aria-modal="true" aria-labelledby="bigTitle" hidden>
@@ -946,15 +951,15 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
  <div class="sheet-in">
   <div class="sh-head">
     <div class="av"><svg style="color:#13231f" aria-hidden="true"><use href="#rabbit"/></svg></div>
-    <div><h2 id="suziTitle">SUZI 무엇이든 물어보세요<sup><a href="#fn" id="fnLink" style="color:inherit;text-decoration:none">*</a></sup></h2><p>호텔 · 경로 · 명소 · 항공권 · 핫 키워드 · 최고 성능 모델로 답해요</p></div>
-    <div class="hd-btns"><button class="x" id="gear" type="button" aria-label="SUZI 연결 설정">⚙</button><button class="x" id="close" type="button" aria-label="닫기">×</button></div>
+    <div><h2 id="suziTitle"><span id="suziTitleTxt">무엇이든 물어보세요</span><sup><a href="#fn" id="fnLink" style="color:inherit;text-decoration:none">*</a></sup></h2><p>호텔 · 경로 · 명소 · 항공권 · 핫 키워드 · 최고 성능 모델로 답해요</p></div>
+    <div class="hd-btns"><button class="x" id="gear" type="button" aria-label="연결 설정">⚙</button><button class="x" id="close" type="button" aria-label="닫기">×</button></div>
   </div>
   <div class="connbar" id="connbar"></div>
   <div class="chips" id="chips"></div>
   <div class="log" id="log" aria-live="polite"></div>
   <p class="fine">* 실시간 검색 없이 답해요. 가격과 운항 정보는 예약 전에 꼭 확인하세요. "넣어줘", "바꿔줘"라고 하면 일정에 바로 반영돼요.</p>
   <form class="composer" id="form">
-    <textarea id="q" rows="1" placeholder="예) Day 2에 엄마랑 갈 조용한 카페 넣어줘" aria-label="SUZI에게 보낼 질문"></textarea>
+    <textarea id="q" rows="1" placeholder="예) Day 2에 엄마랑 갈 조용한 카페 넣어줘" aria-label="질문 입력"></textarea>
     <button class="send" id="send" type="submit">보내기</button>
   </form>
  </div>
@@ -1083,7 +1088,7 @@ const PLAN_B = {
  {title:"빅토리아 피크 · 출국", sub:"약 5천 보 · 짐 먼저 부치고 빈손으로",
   key:{name:"빅토리아 피크 (오전)", why:"맑은 오전에 올라가면 하버와 구룡이 가장 멀리까지 보여요. 피크트램 승강장이 홍콩역에서 가까워 짐을 부친 뒤 빈손으로 다녀오기 좋아요."},
   items:[
-  {t:"09:30",n:"체크아웃 → 홍콩역 인타운 체크인",q:"Hong Kong Station Airport Express",lat:22.2849,lng:114.1582,why:"짐을 먼저 부치면 마지막 반나절을 빈손으로 다닐 수 있어요.",note:"이 코스는 오후 4시 이후 출발편일 때 여유로워요. 항공편이 이르면 SUZI에게 \"Day 4를 타이퀀 코스로 바꿔줘\"라고 하세요."},
+  {t:"09:30",n:"체크아웃 → 홍콩역 인타운 체크인",q:"Hong Kong Station Airport Express",lat:22.2849,lng:114.1582,why:"짐을 먼저 부치면 마지막 반나절을 빈손으로 다닐 수 있어요.",note:"이 코스는 오후 4시 이후 출발편일 때 여유로워요. 항공편이 이르면 토끼에게 \"Day 4를 타이퀀 코스로 바꿔줘\"라고 하세요."},
   {t:"10:15",n:"피크트램 (가든로드 승강장)",q:"Peak Tram Garden Road Lower Terminus",lat:22.2780,lng:114.1590,why:"홍콩역에서 택시로 5분이에요. 오전엔 줄이 짧은 편이에요."},
   {t:"10:45",n:"스카이테라스 428 · 피크 산책",q:"Sky Terrace 428 The Peak",lat:22.2712,lng:114.1497,why:"피크타워 옥상 전망대예요. 걷기 부담 없이 엘리베이터로 올라가 360도로 봐요.",note:"시간이 되면 루가드 로드를 10분만 걸어도 다른 각도의 전망이 나와요.",key:true},
   {t:"12:00",n:"피크에서 가벼운 점심",q:"The Peak Galleria",lat:22.2715,lng:114.1505,why:"여행 마지막 식사를 전망 보며 천천히 해요."},
@@ -1128,7 +1133,7 @@ const PLAN_C = {
  {title:"란타우 빅부다 · 출국", sub:"약 6천 보 · 공항 옆 섬에서 마무리",
   key:{name:"옹핑 360 · 빅부다", why:"케이블카로 25분 동안 바다와 산 위를 지나면 거대한 청동 불상이 나와요. 퉁청이 공항 바로 옆이라 마지막 날 동선 낭비가 없어요."},
   items:[
-  {t:"09:00",n:"체크아웃 → 홍콩역 인타운 체크인",q:"Hong Kong Station Airport Express",lat:22.2849,lng:114.1582,why:"짐을 먼저 부치면 마지막 반나절을 빈손으로 다닐 수 있어요.",note:"오후 4시 이후 출발편일 때 여유로워요. 항공편이 이르면 SUZI에게 Day 4를 타이퀀 코스로 바꿔 달라고 하세요."},
+  {t:"09:00",n:"체크아웃 → 홍콩역 인타운 체크인",q:"Hong Kong Station Airport Express",lat:22.2849,lng:114.1582,why:"짐을 먼저 부치면 마지막 반나절을 빈손으로 다닐 수 있어요.",note:"오후 4시 이후 출발편일 때 여유로워요. 항공편이 이르면 토끼에게 Day 4를 타이퀀 코스로 바꿔 달라고 하세요."},
   {t:"10:00",n:"MTR 퉁청선 → 옹핑 360 케이블카",q:"Ngong Ping 360 Tung Chung",lat:22.2895,lng:113.9435,why:"홍콩역에서 퉁청까지 30분, 케이블카 25분이에요.",note:"크리스털 캐빈(바닥 유리)은 선택이에요. 바람이 세면 운행이 멈출 수 있어 당일 운행 여부를 확인하세요."},
   {t:"11:00",n:"빅부다 (천단대불) · 포린사",q:"Tian Tan Buddha",lat:22.2540,lng:113.9050,why:"계단 268개를 오르면 불상 아래에서 란타우 산이 내려다보여요. 힘들면 아래에서 올려다봐도 충분히 커요.",key:true},
   {t:"12:15",n:"포린사 채식 점심",q:"Po Lin Monastery Vegetarian Kitchen",lat:22.2550,lng:113.9055,why:"절에서 운영하는 소박한 채식 식당이에요. 두부와 버섯 요리가 깔끔해요."},
@@ -1175,7 +1180,7 @@ const EXTRA=[
 ];
 // 장소별 운영 정보 (2025년 기준 참고값 · 예약 전 공식 사이트 확인)
 const INFO={
- "Shun Tak Centre Hong Kong":{type:"호텔",hours:"체크인 보통 15:00 · 체크아웃 12:00 (호텔별 상이)",fee:"",tip:"신덕센터(마카오 페리터미널)와 MTR 셩완역이 바로 옆이에요. 홍콩역에서 택시 5분, 트램·스타페리 피어까지 걸어서 10~15분이에요. 호텔 이름이 정해지면 SUZI에게 말해 주세요.",hotel:true,src:"https://shuntakgroup.com/en/business/property/portfolio/1045",upd:"순탁센터 자체는 호텔이 아닌 상가·페리터미널 복합건물이며, 실제 투숙 호텔의 체크인 시간은 해당 호텔에서 확인 필요.",conf:"low"},
+ "Shun Tak Centre Hong Kong":{type:"호텔",hours:"체크인 보통 15:00 · 체크아웃 12:00 (호텔별 상이)",fee:"",tip:"신덕센터(마카오 페리터미널)와 MTR 셩완역이 바로 옆이에요. 홍콩역에서 택시 5분, 트램·스타페리 피어까지 걸어서 10~15분이에요. 호텔 이름이 정해지면 토끼에게 말해 주세요.",hotel:true,src:"https://shuntakgroup.com/en/business/property/portfolio/1045",upd:"순탁센터 자체는 호텔이 아닌 상가·페리터미널 복합건물이며, 실제 투숙 호텔의 체크인 시간은 해당 호텔에서 확인 필요.",conf:"low"},
  "Hong Kong International Airport":{type:"교통",hours:"24시간 운영 · 공항철도 05:50~00:48, 10분 간격",fee:"공항철도 홍콩역까지 편도 HK$130 (옥토퍼스 HK$120) · 2025년 6월 인상",tip:"입국 후 '공항철도(Airport Express)' 표지를 따라가요. 홍콩역에서 숙소까지 택시 5분이에요.",site:"https://www.hongkongairport.com",siteName:"홍콩국제공항",src:"https://www.thestandard.com.hk/news/article/300845/Airport-Express-proposes-fare-increase-amid-rising-costs-and-planned-upgrades",upd:"공항철도 요금이 2025년 인상되어 홍콩역 기준 1회권 HK$130·옥토퍼스 HK$120 (MTR 공식 페이지 직접 확인은 못 함).",conf:"medium"},
  "Hong Kong Station Airport Express":{type:"교통",hours:"인타운 체크인 항공사별 상이(캐세이 06:00~23:00 · 홍콩항공 06:00~19:00) · 공항철도 05:50~00:48",fee:"공항철도 편도 HK$130 (옥토퍼스 HK$120) · 인타운 체크인 무료",tip:"출발 90분~24시간 전에 짐을 부칠 수 있어요(항공사별 상이). 이용 항공사가 인타운 체크인을 지원하는지 꼭 확인하세요.",site:"https://www.mtr.com.hk/en/customer/services/complom_checkin.html",siteName:"MTR 인타운 체크인",src:"https://www.mtr.com.hk/en/customer/services/complom_checkin.html",upd:"인타운 체크인은 캐세이·홍콩항공·콴타스·싱가포르항공 운항편만 가능, 출발 1일 전부터 90분 전까지.",conf:"medium"},
  "Star Ferry Central Pier 7":{type:"페리",hours:"센트럴 7번 피어 ↔ 침사추이 06:30~23:30, 6~12분 간격",fee:"HK$5~6.5 (평일/주말, 상층 기준) · 옥토퍼스 가능",tip:"상층(upper deck)이 뷰가 좋아요. 해 질 무렵 타면 양쪽 스카이라인을 다 봐요. 10분 걸려요.",site:"https://www.starferry.com.hk",siteName:"스타페리",src:"https://www.thestandard.com.hk/news/article/337099/Star-Ferry-seeks-30pc-fare-rise-plans-pet-friendly-service",upd:"30% 인상안(평일 HK$6.5·주말 HK$8.5) 2026년 8월 교통자문위 심의 중, 승인·시행일 미확정.",conf:"medium"},
@@ -1374,7 +1379,7 @@ function render(){
     const sub=custom?`${d.items.length}곳 · 오늘의 한 곳 ${keyIt?keyIt.n:'미정'}`:(d.sub||'');
     sec.innerHTML=`<div class="dayhead"><div class="daynum">${String(di+1).padStart(2,'0')}</div><h2>${esc(d.title)}</h2><div class="sub">${esc(sub)}</div></div>`
       +(custom?`<div class="dayact"><button class="ghost addbtn" type="button" data-day="${di+1}">＋ 장소 넣기</button>${d.items.some(x=>!x.hotel)?'':'<span class="hint">아직 비어 있어요. 장소를 골라 넣어 보세요.</span>'}</div>`:'')
-      +(isMac(d)?`<div class="callout"><b>날짜 고정 예정</b> 마카오 행사 날짜가 정해지면 SUZI에게 "마카오를 Day ○로 옮겨줘"라고 하세요. 11월 하순 그랑프리 기간엔 도로 통제와 페리 혼잡이 있을 수 있어요.</div>`:'')
+      +(isMac(d)?`<div class="callout"><b>날짜 고정 예정</b> 마카오 행사 날짜가 정해지면 토끼에게 "마카오를 Day ○로 옮겨줘"라고 하세요. 11월 하순 그랑프리 기간엔 도로 통제와 페리 혼잡이 있을 수 있어요.</div>`:'')
       +(keyCard?`<div class="key"><div class="lbl">오늘의 한 곳</div><h3>${esc(keyCard.name)}</h3><p>${esc(keyCard.why||'')}</p></div>`:'')
       +`<div class="mapbox"><div class="map"></div><button class="expand" type="button" data-big="d${di+1}" data-title="Day ${di+1} 지도">크게 보기</button></div><ol class="tl"></ol>`;
     const ol=sec.querySelector('ol');
@@ -1383,7 +1388,7 @@ function render(){
       const li=document.createElement('li');
       li.className=(it.key?'hl ':'')+(it.added?'new ':'')+(custom?'ed':'');
       li.dataset.day=di; li.dataset.idx=ii;
-      const tag=it.added?`<span class="tag">${it.by==='me'?'직접 추가':'SUZI 추가'}</span>`:'';
+      const tag=it.added?`<span class="tag">${it.by==='me'?'직접 추가':'토끼 추가'}</span>`:'';
       const tcell=custom?`<div class="t"><input type="time" class="tin" value="${esc(it.t||'')}" aria-label="시간"></div>`:`<div class="t">${esc(it.t||'')}</div>`;
       li.innerHTML=`${tcell}<div class="c"><div class="name"><span class="pn">${ii+1}</span><button class="nm" type="button" aria-label="${esc(it.n)} 정보 보기">${esc(it.n)}${tag}</button></div><p class="why">${esc(it.why||'')}</p>${it.note?`<p class="note">${esc(it.note)}</p>`:''}<div class="act"><a class="gm" href="${gm(it.q||it.n)}" target="_blank" rel="noopener">구글 지도에서 열기 ↗</a>${custom?'<button class="rm" type="button">빼기</button>':''}</div></div>`;
       ol.appendChild(li);
@@ -1445,7 +1450,7 @@ function renderCatalog(){
   const qv=document.getElementById('search').value.trim().toLowerCase();
   const list=CATALOG.filter(p=>(addArea==="전체"||p.area===addArea)&&(!qv||p.n.toLowerCase().includes(qv)||p.q.toLowerCase().includes(qv)));
   document.getElementById('areas').innerHTML=["전체",...AREAS].map(a=>`<button class="chip${a===addArea?' on':''}" type="button" data-a="${esc(a)}">${esc(a)}</button>`).join('');
-  document.getElementById('catalog').innerHTML=list.length?list.map(p=>`<button class="pl${addSel===p?' on':''}" type="button" data-q="${esc(p.q)}" aria-pressed="${addSel===p}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)}</span><span class="w">${esc(p.why)}</span></button>`).join(''):'<p class="hint">찾는 장소가 없어요. SUZI에게 "○○ 넣어줘"라고 해 보세요.</p>';
+  document.getElementById('catalog').innerHTML=list.length?list.map(p=>`<button class="pl${addSel===p?' on':''}" type="button" data-q="${esc(p.q)}" aria-pressed="${addSel===p}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)}</span><span class="w">${esc(p.why)}</span></button>`).join(''):'<p class="hint">찾는 장소가 없어요. 토끼에게 "○○ 넣어줘"라고 해 보세요.</p>';
 }
 function updateAddForm(){ document.getElementById('selName').textContent=addSel?'선택: '+addSel.n:'아래에서 장소를 고르세요'; document.getElementById('addGo').disabled=!addSel; }
 document.getElementById('addClose').onclick=closeAdd;
@@ -1488,10 +1493,10 @@ function openInfo(it){
   if(inf.upd) html+=`<div><h3>최근 확인 메모</h3><p class="note">${esc(inf.upd)}</p></div>`;
   html+=`<div><h3>위치</h3><div class="infomap" id="infomap"></div></div>`;
   html+=`<div class="links"><a href="${gm(it.q||it.n)}" target="_blank" rel="noopener">구글 지도에서 열기 ↗</a>${inf.site?`<a href="${esc(inf.site)}" target="_blank" rel="noopener">${esc(inf.siteName||'공식 사이트')} ↗</a>`:''}</div>`;
-  if(hotel) html+=`<button class="ask" type="button" id="askHotel">SUZI에게 호텔 추천 물어보기</button>`;
-  else if(kind==="페리") html+=`<button class="ask" type="button" id="askFerry">SUZI에게 페리 시간표·예매 물어보기</button>`;
+  if(hotel) html+=`<button class="ask" type="button" id="askHotel">${esc(askTo("호텔 추천"))}</button>`;
+  else if(kind==="페리") html+=`<button class="ask" type="button" id="askFerry">${esc(askTo("페리 시간표·예매"))}</button>`;
   const asOf=inf.asOf||INFO_ASOF; const confTxt=inf.conf==='high'?'공식 자료로 확인':(inf.conf==='medium'?'복수 자료로 확인':'공식 확인 안 됨 · 참고만');
-  html+=`<p class="fine">* 정보 기준일 ${esc(asOf)}${inf.conf?' · '+confTxt:''}${inf.edited?' · 이 기기에서 직접 고친 값이에요':''}${inf.src?` · <a href="${esc(inf.src)}" target="_blank" rel="noopener">확인한 출처 ↗</a>`:''}. 현지 사정으로 바뀔 수 있으니 예약 전에 공식 사이트에서 꼭 확인하세요. 달라진 걸 보셨다면 SUZI에게 "${esc(it.n)} 영업시간 ○○로 바꿔줘"라고 하면 바로 고쳐 둘게요.</p>`;
+  html+=`<p class="fine">* 정보 기준일 ${esc(asOf)}${inf.conf?' · '+confTxt:''}${inf.edited?' · 이 기기에서 직접 고친 값이에요':''}${inf.src?` · <a href="${esc(inf.src)}" target="_blank" rel="noopener">확인한 출처 ↗</a>`:''}. 현지 사정으로 바뀔 수 있으니 예약 전에 공식 사이트에서 꼭 확인하세요. 달라진 걸 보셨다면 토끼에게 "${esc(it.n)} 영업시간 ○○로 바꿔줘"라고 하면 바로 고쳐 둘게요.</p>`;
   document.getElementById('infoBody').innerHTML=html;
   infosheet.hidden=false; scrim.hidden=false; fab.hidden=true;
   const el=document.getElementById('infomap');
@@ -1537,16 +1542,38 @@ function md(s){
   });
   if(inList) out+='</ul>'; return out;
 }
-function hello(){ bubble('ai',md("안녕하세요, 모녀 여행 도우미 **SUZI**예요. 깡총!\n호텔, 경로, 명소, 항공권, 요즘 핫한 키워드까지 물어보세요.\n\"Day 2에 ○○ 넣어줘\", \"마카오를 Day 2로 옮겨줘\"처럼 말하면 일정에 바로 반영할게요.")); if(!BACKEND){ connOpen=true; renderConnBar(); } }
+function hello(){ const nm=travelerName(); bubble('ai',md("안녕하세요, "+(nm?nm+"님의 ":"")+"여행 도우미 **토끼**예요. 깡총!\n호텔, 경로, 명소, 항공권, 요즘 핫한 키워드까지 물어보세요.\n\"Day 2에 ○○ 넣어줘\", \"마카오를 Day 2로 옮겨줘\"처럼 말하면 일정에 바로 반영할게요.")); if(!nm) bubble('sys','⚙ 설정에서 여행자 이름을 적으면 "○○의 여정", "○○에게 물어보기"로 바뀌어요'); if(!BACKEND){ connOpen=true; renderConnBar(); } }
 
 let sample=null, toolsOK=false, busy=false, ctl=null, turns=[], tierNoted=false;
 
+// ---- 설정(tokki-settings-v1): 여행자 이름 등. 설계 v3의 settings 자리 ----
+const SETTINGS_KEY="tokki-settings-v1";
+let SETTINGS={v:1,profile:{name:""}};
+try{ const s0=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"null"); if(s0&&typeof s0==="object") SETTINGS={...SETTINGS,...s0,profile:{...SETTINGS.profile,...(s0.profile||{})}}; }catch(e){}
+function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS)); }catch(e){} }
+function travelerName(){ return String(SETTINGS.profile.name||"").replace(/[\u0000-\u001f]/g,"").trim().slice(0,20); }
+function askTo(topic){ const n=travelerName(); return (n?n+"에게 ":"")+(topic?topic+" ":"")+"물어보기"; }
+function applyProfile(){
+  const n=travelerName();
+  const who=document.getElementById('who'); if(who){ who.textContent=n?`${n}의 여정`:''; who.hidden=!n; }
+  const tt=document.getElementById('suziTitleTxt'); if(tt) tt.textContent=n?`${n}, 무엇이든 물어보세요`:'무엇이든 물어보세요';
+  fab.setAttribute('aria-label', askTo());
+  if(typeof BACKEND!=="undefined"&&BACKEND) setFabLabel(askTo());
+}
+// 카카오톡 등 인앱 브라우저: 저장소가 Safari와 분리되므로 안내 (설계 1.1)
+(function(){ const ua=navigator.userAgent||""; const inapp=/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\//i.test(ua); const el=document.getElementById('inapp'); if(!el||!inapp) return;
+  const ios=/iPhone|iPad|iPod/i.test(ua); const href=location.href;
+  const open=ios?`kakaotalk://web/openExternal?url=${encodeURIComponent(href)}`:`intent://${href.replace(/^https?:\/\//,'')}#Intent;scheme=https;package=com.android.chrome;end`;
+  el.innerHTML=`<span>앱 안에서 열렸어요. 여정이 저장되게 하려면 Safari나 Chrome으로 여세요.</span><a href="${open}" rel="noopener">브라우저로 열기</a>`; el.hidden=false; })();
+
 // ---- SUZI 연결: ① claude.ai 아티팩트(sample) ② 외부 서버(프록시) ③ API 키 직접(테스트용) ----
-// 공유 전에 아래 url/token을 적어 두면, 받는 사람은 설정 없이 바로 SUZI를 쓸 수 있어요.
-const SUZI_DEFAULT={url:"",token:"",model:"claude-opus-5-5"};
+// 공유 전에 아래 url/token을 적어 두면, 받는 사람은 설정 없이 바로 토끼 도우미를 쓸 수 있어요.
+const SUZI_DEFAULT={url:"https://suzi-proxy.suzi-proxy.workers.dev/",token:"",model:"claude-opus-5-5"};
 const CONN_KEY="suzi-hk-conn-v1";
 let CONN={mode:"auto",url:SUZI_DEFAULT.url,token:SUZI_DEFAULT.token,key:"",model:SUZI_DEFAULT.model};
 try{ const c=JSON.parse(localStorage.getItem(CONN_KEY)||"null"); if(c&&typeof c==="object") CONN={...CONN,...c}; }catch(e){}
+// 사용자가 서버 주소·토큰을 직접 바꾼 적(custom)이 없으면 항상 공유용 기본값을 따른다 → 서버를 옮겨도 모든 기기에 반영
+if(!CONN.custom){ CONN.url=SUZI_DEFAULT.url; CONN.token=SUZI_DEFAULT.token; }
 function saveConn(){ try{ localStorage.setItem(CONN_KEY, JSON.stringify(CONN)); }catch(e){} }
 let BACKEND=null, connOpen=false;
 function setFabLabel(t){ fab.querySelector('.face').nextSibling.textContent=t; }
@@ -1558,7 +1585,7 @@ async function connect(){
   }
   if(!BACKEND&&CONN.mode!=="key"&&CONN.url){ BACKEND={kind:"proxy",label:"외부 서버"}; toolsOK=true; }
   if(!BACKEND&&CONN.mode!=="proxy"&&CONN.key){ BACKEND={kind:"key",label:"API 키 직접"}; toolsOK=true; }
-  setFabLabel(BACKEND?'SUZI에게 물어보기':'SUZI 연결 설정');
+  setFabLabel(BACKEND?askTo():'연결 설정');
   renderConnBar();
   return BACKEND;
 }
@@ -1566,6 +1593,7 @@ function renderConnBar(){
   const el=document.getElementById('connbar'); if(!el) return;
   const st=BACKEND?`연결됨 · ${esc(BACKEND.label)}${BACKEND.kind!=="artifact"?' · '+esc(CONN.model):''}`:'연결 안 됨 · 설정이 필요해요';
   el.innerHTML=`<div class="cstat"><span class="${BACKEND?'ok':'no'}">●</span> ${st}<button class="linkbtn" type="button" id="connToggle">${connOpen?'설정 닫기':'연결 설정'}</button></div>`+(connOpen?`<form class="cform" id="cform" autocomplete="off">
+   <label>여행자 이름 <input id="cName" type="text" maxlength="20" placeholder="예: 수지 → 수지의 여정 · 수지에게 물어보기" autocomplete="off"></label>
    <label>연결 방식 <select id="cMode"><option value="auto">자동 (아티팩트 → 서버 → 키 순서)</option><option value="proxy">외부 서버(프록시)</option><option value="key">API 키 직접 (본인 테스트용)</option></select></label>
    <label>서버 주소 <input id="cUrl" type="url" placeholder="https://suzi-proxy.….workers.dev" inputmode="url" autocapitalize="off" spellcheck="false"></label>
    <label>서버 토큰 (선택) <input id="cTok" type="password" placeholder="서버를 만들 때 정한 토큰"></label>
@@ -1575,15 +1603,18 @@ function renderConnBar(){
    <p class="fine">주소·토큰·키는 이 기기 브라우저에만 저장돼요. API 키 직접 방식은 키가 노출될 수 있으니 공유용 파일에는 넣지 말고 본인 테스트에만 쓰세요.</p></form>`:'');
   document.getElementById('connToggle').onclick=()=>{ connOpen=!connOpen; renderConnBar(); };
   const f=document.getElementById('cform'); if(!f) return;
-  f.querySelector('#cMode').value=CONN.mode; f.querySelector('#cUrl').value=CONN.url||''; f.querySelector('#cTok').value=CONN.token||''; f.querySelector('#cKey').value=CONN.key||''; f.querySelector('#cModel').value=CONN.model||'claude-opus-5-5';
+  f.querySelector('#cName').value=travelerName(); f.querySelector('#cMode').value=CONN.mode; f.querySelector('#cUrl').value=CONN.url||''; f.querySelector('#cTok').value=CONN.token||''; f.querySelector('#cKey').value=CONN.key||''; f.querySelector('#cModel').value=CONN.model||'claude-opus-5-5';
   f.onsubmit=async e=>{ e.preventDefault();
-    CONN={mode:f.querySelector('#cMode').value,url:f.querySelector('#cUrl').value.trim(),token:f.querySelector('#cTok').value.trim(),key:f.querySelector('#cKey').value.trim(),model:f.querySelector('#cModel').value};
+    SETTINGS.profile.name=f.querySelector('#cName').value; saveSettings(); applyProfile();
+    const u=f.querySelector('#cUrl').value.trim(), t=f.querySelector('#cTok').value.trim();
+    CONN={mode:f.querySelector('#cMode').value,url:u,token:t,key:f.querySelector('#cKey').value.trim(),model:f.querySelector('#cModel').value,custom:(u!==SUZI_DEFAULT.url||t!==SUZI_DEFAULT.token)};
     saveConn(); connOpen=false; const b=await connect();
-    bubble('sys', b?`SUZI 연결됨 · ${b.label}`:'아직 연결되지 않았어요. 서버 주소나 키를 확인해 주세요');
+    bubble('sys', b?`연결됨 · ${b.label}`:'아직 연결되지 않았어요. 서버 주소나 키를 확인해 주세요');
   };
-  f.querySelector('#cClear').onclick=async()=>{ CONN={mode:"auto",url:SUZI_DEFAULT.url,token:SUZI_DEFAULT.token,key:"",model:SUZI_DEFAULT.model}; saveConn(); await connect(); };
+  f.querySelector('#cClear').onclick=async()=>{ CONN={mode:"auto",url:SUZI_DEFAULT.url,token:SUZI_DEFAULT.token,key:"",model:SUZI_DEFAULT.model,custom:false}; saveConn(); await connect(); };
 }
 document.getElementById('gear').onclick=()=>{ connOpen=!connOpen; renderConnBar(); };
+applyProfile();
 connect();
 
 // ---- Claude Messages API 직접 호출 (외부 서버 또는 API 키) : 아티팩트 sample()과 같은 모양으로 ----
@@ -1650,7 +1681,7 @@ async function apiChat(msgs, opts){
 function compactPlan(){
   return JSON.stringify({trip:plan.trip, days:plan.days.map((d,i)=>({day:i+1,title:d.title,macau:!!d.macau,key:d.key&&d.key.name,items:d.items.map((it,j)=>({idx:j+1,t:it.t,n:it.n}))}))});
 }
-const RULES=()=>`너는 "SUZI"야. 엄마와 딸의 홍콩·마카오 3박 4일 여행을 돕는 다정하고 센스 있는 토끼 여행 도우미야.
+const RULES=()=>`너는 "토끼"야. ${travelerName()?`여행자 이름은 "${travelerName()}"이고, `:""}엄마와 딸의 홍콩·마카오 3박 4일 여행을 돕는 다정하고 센스 있는 토끼 여행 도우미야. 자신을 부를 땐 "토끼"라고 해.
 [여행 조건] 11월 말 3박 4일, 숙소는 셩완 마카오 페리터미널(신덕센터) 근처 3박 고정, 하루 핵심 장소 1곳(최대 2곳) 원칙의 여유로운 일정, 엄마는 하루 1~1.5만 보 가능, 관심사는 딤섬·애프터눈티, 야경·뷰포인트, 감성 포토스팟·문화. 마카오는 하루, 날짜는 행사에 맞춰 나중에 고정.
 [주요 주제] 호텔, 경로, 명소, 항공권, 요즘 여행 핫 키워드.
 [답변 규칙] 한국어 존댓말, 휴대폰 화면 기준 짧게(최대 10줄 안팎), 필요하면 '- ' 목록. 실시간 검색을 못 하니 가격·운항편·영업시간·최신 트렌드는 '최근 기준 확인 필요'라고 짧게 밝혀. 모르는 건 지어내지 마. 토끼다운 말투는 한 답변에 한 번 정도만 살짝(예: 깡총).
@@ -1692,11 +1723,11 @@ const TOOLS=[
   execute(i){ snapshot(); const t=plan.trip; if(i.dates) t.dates=String(i.dates); if(i.flight_in) t.flightIn=String(i.flight_in); if(i.flight_out) t.flightOut=String(i.flight_out); if(i.macau) t.macau=String(i.macau); save(); render(); return {ok:true}; }}
 ];
 
-const ERR={not_granted:"SUZI 사용이 허용되지 않았어요. 아티팩트에선 권한에서 Claude 사용을 허용하고, 외부 서버·키 방식에선 연결 설정의 주소·토큰·키를 확인해 주세요.",invalid_request:"요청 형식이 맞지 않아요. 연결 설정의 모델 이름을 확인해 주세요.",upstream_error:"서버가 잠깐 불안정해요. 조금 뒤 다시 보내 주세요.",empty_completion:"답을 만들지 못했어요. 질문을 조금 바꿔 다시 물어봐 주세요.",sampling_disabled:"이 계정에서는 SUZI를 쓸 수 없어요.",rate_limited:"질문이 많아 잠깐 쉬어야 해요. 조금 뒤 다시 물어봐 주세요.",session_expired:"로그인이 만료됐어요. 다시 로그인해 주세요.",refused:"이 질문에는 답하기 어려워요. 다르게 물어봐 주세요.",prompt_too_large:"대화가 너무 길어졌어요. 페이지를 새로 열고 다시 물어봐 주세요."};
+const ERR={not_granted:"토끼 도우미 사용이 허용되지 않았어요. 아티팩트에선 권한에서 Claude 사용을 허용하고, 외부 서버·키 방식에선 연결 설정의 주소·토큰·키를 확인해 주세요.",invalid_request:"요청 형식이 맞지 않아요. 연결 설정의 모델 이름을 확인해 주세요.",upstream_error:"서버가 잠깐 불안정해요. 조금 뒤 다시 보내 주세요.",empty_completion:"답을 만들지 못했어요. 질문을 조금 바꿔 다시 물어봐 주세요.",sampling_disabled:"이 계정에서는 토끼 도우미를 쓸 수 없어요.",rate_limited:"질문이 많아 잠깐 쉬어야 해요. 조금 뒤 다시 물어봐 주세요.",session_expired:"로그인이 만료됐어요. 다시 로그인해 주세요.",refused:"이 질문에는 답하기 어려워요. 다르게 물어봐 주세요.",prompt_too_large:"대화가 너무 길어졌어요. 페이지를 새로 열고 다시 물어봐 주세요."};
 async function ask(text){
   if(busy||!text.trim()) return;
   bubble('me',esc(text));
-  if(!BACKEND){ bubble('ai',md("아직 SUZI가 연결되지 않았어요. 세 가지 중 하나로 연결할 수 있어요.\n- claude.ai 아티팩트 링크로 이 페이지를 열기 (로그인만 하면 돼요)\n- 위 \"연결 설정\"에 외부 서버 주소 넣기 (공유용 추천)\n- API 키 직접 넣기 (본인 테스트용)")); connOpen=true; renderConnBar(); return; }
+  if(!BACKEND){ bubble('ai',md("아직 토끼 도우미가 연결되지 않았어요. 세 가지 중 하나로 연결할 수 있어요.\n- claude.ai 아티팩트 링크로 이 페이지를 열기 (로그인만 하면 돼요)\n- 위 \"연결 설정\"에 외부 서버 주소 넣기 (공유용 추천)\n- API 키 직접 넣기 (본인 테스트용)")); connOpen=true; renderConnBar(); return; }
   busy=true; send.disabled=true; q.value='';
   const out=bubble('ai','<span class="hop"><i></i><i></i><i></i> 깊이 생각하는 중이에요 · 1분 정도 걸릴 수 있어요</span><button class="stop" type="button">멈추기</button>');
   out.querySelector('.stop').onclick=()=>{ if(ctl) ctl.abort(); };

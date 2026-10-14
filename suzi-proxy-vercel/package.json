@@ -1,1 +1,1 @@
-{ "name": "suzi-proxy-vercel", "private": true, "version": "1.0.0" }
+{"name":"suzi-proxy-vercel","private":true,"version":"1.0.0","devDependencies":{"vercel":"^64.0.2"}}
