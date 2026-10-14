@@ -1526,7 +1526,7 @@ const CHIPS=[
 document.getElementById('chips').innerHTML=CHIPS.map(([k],i)=>`<button class="chip" type="button" data-i="${i}"><b>#</b>${k}</button>`).join('');
 document.getElementById('chips').onclick=e=>{const b=e.target.closest('.chip'); if(b&&!busy){ ask(CHIPS[+b.dataset.i][1]); }};
 
-function openSheet(){ sheet.hidden=false; scrim.hidden=false; fab.hidden=true; if(!log.children.length) hello(); setTimeout(()=>q.focus(),50); }
+function openSheet(){ sheet.hidden=false; scrim.hidden=false; fab.hidden=true; if(!log.children.length){ if(!loadChat()) hello(); } setTimeout(()=>q.focus(),50); }
 function closeSheet(){ sheet.hidden=true; scrim.hidden=true; fab.hidden=false; fab.focus(); }
 fab.onclick=openSheet; document.getElementById('close').onclick=closeSheet; scrim.onclick=()=>{ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); };
 document.getElementById('fnLink').onclick=()=>closeSheet();
@@ -1545,6 +1545,24 @@ function md(s){
 function hello(){ const nm=travelerName(); bubble('ai',md("안녕하세요, "+(nm?nm+"님의 ":"")+"여행 도우미 **토끼**예요. 깡총!\n호텔, 경로, 명소, 항공권, 요즘 핫한 키워드까지 물어보세요.\n\"Day 2에 ○○ 넣어줘\", \"마카오를 Day 2로 옮겨줘\"처럼 말하면 일정에 바로 반영할게요.")); if(!nm) bubble('sys','⚙ 설정에서 여행자 이름을 적으면 "○○의 여정", "○○에게 물어보기"로 바뀌어요'); if(!BACKEND){ connOpen=true; renderConnBar(); } }
 
 let sample=null, toolsOK=false, busy=false, ctl=null, turns=[], tierNoted=false;
+// ---- 대화 저장: 이 기기 브라우저에만 남긴다(설계 v3 settings와 분리, 용량 때문에 별도 키). 서버에는 보내지 않는다 ----
+const CHAT_KEY="tokki-chat-v1", CHAT_MAX_BUBBLES=60;
+function saveChat(){
+  try{
+    const items=[...log.children].filter(d=>!d.querySelector('.hop,.stop')).map(d=>({c:d.className.replace(/^msg\s*/,''),h:d.innerHTML})).slice(-CHAT_MAX_BUBBLES);
+    localStorage.setItem(CHAT_KEY, JSON.stringify({v:1,at:Date.now(),turns,log:items}));
+  }catch(e){}
+}
+function loadChat(){
+  let c=null; try{ c=JSON.parse(localStorage.getItem(CHAT_KEY)||"null"); }catch(e){ c=null; }
+  if(!c||!Array.isArray(c.log)||!c.log.length) return false;
+  c.log.forEach(it=>{ if(it&&typeof it.h==="string") bubble(String(it.c||'ai').replace(/[^a-z ]/g,''), it.h); });
+  turns=Array.isArray(c.turns)?c.turns.filter(t=>t&&(t.role==="user"||t.role==="assistant")&&typeof t.content==="string"):[];
+  if(turns.length&&turns[0].role!=="user") turns.shift();
+  bubble('sys','이전 대화를 이어서 보여 드려요 · 위 "대화 지우기"로 새로 시작할 수 있어요');
+  return true;
+}
+function clearChat(){ try{ localStorage.removeItem(CHAT_KEY); }catch(e){} turns=[]; if(ctl) ctl.abort(); log.innerHTML=''; hello(); }
 
 // ---- 설정(tokki-settings-v1): 여행자 이름 등. 설계 v3의 settings 자리 ----
 const SETTINGS_KEY="tokki-settings-v1";
@@ -1592,7 +1610,7 @@ async function connect(){
 function renderConnBar(){
   const el=document.getElementById('connbar'); if(!el) return;
   const st=BACKEND?`연결됨 · ${esc(BACKEND.label)}${BACKEND.kind!=="artifact"?' · '+esc(CONN.model):''}`:'연결 안 됨 · 설정이 필요해요';
-  el.innerHTML=`<div class="cstat"><span class="${BACKEND?'ok':'no'}">●</span> ${st}<button class="linkbtn" type="button" id="connToggle">${connOpen?'설정 닫기':'연결 설정'}</button></div>`+(connOpen?`<form class="cform" id="cform" autocomplete="off">
+  el.innerHTML=`<div class="cstat"><span class="${BACKEND?'ok':'no'}">●</span> ${st}<button class="linkbtn" type="button" id="connToggle">${connOpen?'설정 닫기':'연결 설정'}</button><button class="linkbtn" type="button" id="chatClear">대화 지우기</button></div>`+(connOpen?`<form class="cform" id="cform" autocomplete="off">
    <label>여행자 이름 <input id="cName" type="text" maxlength="20" placeholder="예: 수지 → 수지의 여정 · 수지에게 물어보기" autocomplete="off"></label>
    <label>연결 방식 <select id="cMode"><option value="auto">자동 (아티팩트 → 서버 → 키 순서)</option><option value="proxy">외부 서버(프록시)</option><option value="key">API 키 직접 (본인 테스트용)</option></select></label>
    <label>서버 주소 <input id="cUrl" type="url" placeholder="https://suzi-proxy.….workers.dev" inputmode="url" autocapitalize="off" spellcheck="false"></label>
@@ -1602,6 +1620,7 @@ function renderConnBar(){
    <div class="row"><button class="send" type="submit">저장하고 연결</button><button class="ghost" type="button" id="cClear">지우기</button></div>
    <p class="fine">주소·토큰·키는 이 기기 브라우저에만 저장돼요. API 키 직접 방식은 키가 노출될 수 있으니 공유용 파일에는 넣지 말고 본인 테스트에만 쓰세요.</p></form>`:'');
   document.getElementById('connToggle').onclick=()=>{ connOpen=!connOpen; renderConnBar(); };
+  document.getElementById('chatClear').onclick=()=>{ if(busy) return; clearChat(); };
   const f=document.getElementById('cform'); if(!f) return;
   f.querySelector('#cName').value=travelerName(); f.querySelector('#cMode').value=CONN.mode; f.querySelector('#cUrl').value=CONN.url||''; f.querySelector('#cTok').value=CONN.token||''; f.querySelector('#cKey').value=CONN.key||''; f.querySelector('#cModel').value=CONN.model||'claude-opus-5-5';
   f.onsubmit=async e=>{ e.preventDefault();
@@ -1743,10 +1762,11 @@ async function ask(text){
     out.innerHTML=md(ans)+(truncated?'<p style="color:var(--muted);font-size:12px">답이 길어서 중간에 끊겼어요.</p>':'');
     turns.push({role:"assistant",content:ans});
     if(JSON.stringify(plan)!==before) bubble('sys','일정에 반영했어요 · 아래 "방금 변경 되돌리기"로 취소할 수 있어요');
+    saveChat();
   }catch(e){
     if(e&&e.text) out.innerHTML=md(e.text); else out.remove();
     if(!(e&&e.code==="cancelled")) bubble('ai',esc(ERR[e&&e.code]||"연결이 잠깐 끊겼어요. 다시 보내 주세요."));
-    turns.pop();
+    turns.pop(); saveChat();
     if(e&&(e.code==="not_granted"||e.code==="sampling_disabled")){ if(BACKEND&&BACKEND.kind==="artifact") sample=null; else { connOpen=true; renderConnBar(); } }
   }finally{ busy=false; send.disabled=false; }
 }
