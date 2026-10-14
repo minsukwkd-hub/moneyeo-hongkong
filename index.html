@@ -828,8 +828,11 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
 /* 당신의 여정 편집 */
 .dayact{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .hint{font-size:13px;color:var(--muted)}
-.tl li.ed{grid-template-columns:80px 1fr}
-.tin{font:inherit;font-family:var(--mono);font-size:13px;border:1px solid var(--line);border-radius:8px;padding:2px 4px;width:100%;background:var(--surface);color:var(--fg)}
+.tl li.ed{grid-template-columns:88px 1fr}
+.tin{font:inherit;font-family:var(--mono);font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:3px 4px;width:100%;min-width:0;background:var(--surface);color:var(--fg);box-sizing:border-box}
+.tin::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none;margin:0}
+.tin::-webkit-datetime-edit{padding:0}
+.tin::-webkit-datetime-edit-fields-wrapper{padding:0}
 .tl .act{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .tl .mv{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:2px 9px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;line-height:1.4}
 .tl .mv:disabled{opacity:.3;cursor:default}
