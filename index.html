@@ -876,6 +876,10 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
 .cform .row{display:flex;gap:8px;align-items:center}
 .cform .send{padding:8px 14px;border-radius:10px}
 .cform .fine{padding:0}
+.tripform{padding:10px 16px 16px;overflow:auto}
+.tripform .row label{flex:1;min-width:0}
+.stat.edit{cursor:pointer}
+.statushint{margin:6px 0 0;font-size:12px;color:var(--muted)}
 .stop{margin-left:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.hop i{animation:none}}
 </style>
@@ -902,6 +906,7 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
   <p>하루에 핵심 장소는 한 곳만. 나머지는 밥 먹고 쉬는 시간이에요. 아래에서 여정을 고르거나 "당신의 여정"에서 직접 꾸며 보세요. 궁금한 건 오른쪽 아래 토끼에게 물어보면 일정에 바로 반영돼요.</p>
   <div class="pickwrap"><div class="picker" id="picker" role="group" aria-label="여정 고르기"></div><p class="pickdesc" id="pickdesc"></p></div>
   <div class="status" id="status"></div>
+  <p class="statushint" id="statusHint" hidden></p>
 </header>
 
 <nav class="tabs" aria-label="일정 바로가기" id="tabs"></nav>
@@ -991,6 +996,26 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
  </div>
 </div>
 
+<div class="sheet" id="tripsheet" role="dialog" aria-modal="true" aria-labelledby="tripTitle" hidden>
+ <div class="sheet-in">
+  <div class="sh-head">
+    <div class="av plus" aria-hidden="true">✈</div>
+    <div><h2 id="tripTitle">여행 정보</h2><p>날짜·항공편·숙소·동행을 적으면 Day에 날짜가 붙고 토끼가 조건을 알아요</p></div>
+    <button class="x" id="tripClose" type="button" aria-label="닫기">×</button>
+  </div>
+  <form class="cform tripform" id="tripform" autocomplete="off">
+   <label>여행 이름 <input id="tTitle" type="text" maxlength="40" placeholder="예: 엄마랑 홍콩 3박 4일"></label>
+   <div class="row"><label>시작일 <input id="tStart" type="date"></label><label>종료일 <input id="tEnd" type="date"></label></div>
+   <p class="fine" id="tDaysNote" hidden></p>
+   <div class="row"><label>가는 편 <input id="tIn" type="text" maxlength="24" placeholder="예: 7C2101 08:30"></label><label>오는 편 <input id="tOut" type="text" maxlength="24" placeholder="예: 7C2102 15:40"></label></div>
+   <label>숙소 이름 <input id="tLodge" type="text" maxlength="60" placeholder="호텔 이름 (비워 두면 셩완 임시)"></label>
+   <label>숙소 지역 <select id="tArea"></select></label>
+   <label>동행 <select id="tParty"><option value="모녀">모녀</option><option value="가족">가족</option><option value="부부">부부</option><option value="친구">친구</option><option value="혼자">혼자</option></select></label>
+   <div class="row"><button class="send" type="submit">저장</button><button class="ghost" type="button" id="tripCancel">취소</button></div>
+   <p class="fine">시작일·종료일을 넣으면 Day 수가 그에 맞게 늘거나 줄어요. 줄어들 때 그날 일정은 앞날로 합쳐 드려요.</p>
+  </form>
+ </div>
+</div>
 <div class="sheet" id="infosheet" role="dialog" aria-modal="true" aria-labelledby="infoTitle" hidden>
  <div class="sheet-in">
   <div class="sh-head">
@@ -1320,6 +1345,52 @@ function currentDefault(){ return currentMeta().data; }
 function save(){ repo.save(variant,plan); try{ localStorage.setItem(VKEY, variant); }catch(e){} if(typeof SETTINGS!=="undefined"){ SETTINGS.last={type:"trip",id:variant}; saveSettings(); } }
 function stopById(id){ for(const d of plan.days){ const k=d.items.findIndex(x=>x.id===id); if(k>=0) return {d,k,it:d.items[k]}; } return null; }
 function daySummary(d){ return d.items.map(it=>({id:it.id,t:it.t,n:it.n})); }
+// ---- 여행 기본정보(M2a): 날짜·숙소 ----
+const LODGE_AREAS={"셩완":[22.2876,114.1520],"센트럴":[22.2819,114.1580],"완차이":[22.2770,114.1730],"코즈웨이베이":[22.2800,114.1850],"침사추이":[22.2976,114.1722],"조던·야우마테이":[22.3060,114.1700],"몽콕":[22.3193,114.1694],"마카오":[22.1930,113.5400]};
+function lodgingOf(){ const l=plan.trip&&plan.trip.lodging&&plan.trip.lodging[0]; if(l&&isFinite(l.lat)&&isFinite(l.lng)) return l; return {name:HOTEL.n,q:HOTEL.q,lat:HOTEL.lat,lng:HOTEL.lng,area:"셩완",isDefault:true}; }
+function parseYMD(v){ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(v||""))) return null; const d=new Date(v+"T12:00:00"); return isNaN(d)?null:d; }
+const KDAY=["일","월","화","수","목","금","토"];
+function fmtMD(d){ return `${d.getMonth()+1}/${d.getDate()} (${KDAY[d.getDay()]})`; }
+function tripStart(){ return parseYMD(plan.trip&&plan.trip.dates&&plan.trip.dates.start); }
+function tripEnd(){ return parseYMD(plan.trip&&plan.trip.dates&&plan.trip.dates.end); }
+function dayDate(di){ const s0=tripStart(); if(!s0) return ""; const d=new Date(s0); d.setDate(d.getDate()+di); return fmtMD(d); }
+function dayCountBetween(a,b){ return Math.round((b-a)/86400000)+1; }
+function tripDatesLabel(){ const a=tripStart(), b=tripEnd(); if(a&&b&&b>=a){ const n=dayCountBetween(a,b); return `${fmtMD(a)} ~ ${fmtMD(b)} · ${n-1}박 ${n}일`; } return (plan.trip&&plan.trip.dates&&plan.trip.dates.label)||"미정"; }
+// Day 수를 n으로 맞춘다. 첫날·마지막날은 유지하고 가운데 날을 더하거나 뺀다. 빠지는 날의 일정은 앞날로 합친다.
+function applyDayCount(n){
+  n=Math.max(1,Math.min(30,Math.round(n))); const days=plan.days; if(n===days.length) return "";
+  const first=days[0], last=days.length>1?days[days.length-1]:null, middle=days.slice(1,Math.max(1,days.length-1));
+  let moved=0;
+  if(n===1){ const all=[...middle,...(last?[last]:[])]; all.forEach(d=>{ moved+=d.items.length; first.items.push(...d.items); }); sortDay(first); plan.days=[first]; }
+  else{
+    const want=n-2; const mid=middle.slice();
+    if(want>mid.length){ const names=["둘째 날","셋째 날","넷째 날","다섯째 날","여섯째 날","일곱째 날","여덟째 날","아홉째 날","열째 날"]; while(mid.length<want){ const k=mid.length+1; mid.push(normalizeDoc({days:[{title:names[k-1]||`${k+1}일째`,items:[]}]}).days[0]); } }
+    else if(want<mid.length){ const extra=mid.splice(want); const sink=mid.length?mid[mid.length-1]:first; extra.forEach(d=>{ moved+=d.items.length; sink.items.push(...d.items); }); sortDay(sink); }
+    const tail=last||normalizeDoc({days:[{title:"떠나는 날",items:[]}]}).days[0];
+    plan.days=[first,...mid,tail];
+  }
+  return moved?`${moved}곳을 앞날로 합쳤어요`:"";
+}
+function setTripFields(f){
+  const t=plan.trip; let note="";
+  if(f.title!==undefined) plan.title=String(f.title).trim().slice(0,40)||undefined;
+  if(f.start!==undefined||f.end!==undefined){ t.dates={...(t.dates||{}),start:parseYMD(f.start)?f.start:(f.start===""?undefined:t.dates.start),end:parseYMD(f.end)?f.end:(f.end===""?undefined:t.dates.end)}; }
+  if(f.label!==undefined) t.dates={...(t.dates||{}),label:String(f.label).slice(0,60)};
+  if(f.flight_in!==undefined) t.flights.in=f.flight_in?{code:String(f.flight_in).slice(0,24)}:null;
+  if(f.flight_out!==undefined) t.flights.out=f.flight_out?{code:String(f.flight_out).slice(0,24)}:null;
+  if(f.lodging_name!==undefined||f.lodging_area!==undefined){
+    const cur=t.lodging[0]||{}; const name=f.lodging_name!==undefined?String(f.lodging_name).trim().slice(0,60):(cur.name||"");
+    const area=LODGE_AREAS[f.lodging_area]?f.lodging_area:(LODGE_AREAS[cur.area]?cur.area:"셩완"); const ll=LODGE_AREAS[area];
+    t.lodging = name ? [{id:cur.id||newId(),name,area,q:name+" "+(area==="마카오"?"Macau":"Hong Kong"),lat:ll[0],lng:ll[1]}] : [];
+  }
+  if(f.party!==undefined) t.party={...(t.party||{}),type:["모녀","가족","부부","친구","혼자"].includes(f.party)?f.party:"모녀"};
+  const a=tripStart(), b=tripEnd(); if(a&&b&&b>=a){ const n=dayCountBetween(a,b); if(n<=30) note=applyDayCount(n); }
+  return note;
+}
+function tripBrief(){
+  const t=plan.trip||{}, L0=lodgingOf(), fl=t.flights||{}, party=(t.party&&t.party.type)||"모녀", n=plan.days.length;
+  return `[여행 조건] ${plan.title?`여행 이름 "${plan.title}", `:""}동행 ${party}, 기간 ${tripDatesLabel()}${n>1&&!/박/.test(tripDatesLabel())?` (${n-1}박 ${n}일)`:""}, 항공편 ${fl.in&&fl.in.code||"미정"} / ${fl.out&&fl.out.code||"미정"}, 숙소 ${L0.isDefault?"셩완 마카오 페리터미널(신덕센터) 근처(임시)":L0.name+" ("+L0.area+")"}. 하루 핵심 장소 1곳(최대 2곳) 원칙의 여유로운 일정, ${party==="모녀"?"엄마는 하루 1~1.5만 보 가능, ":""}관심사는 딤섬·애프터눈티, 야경·뷰포인트, 감성 포토스팟·문화. 마카오는 하루.`;
+}
 function switchPlan(id){ if(!metaOf(id)) return; if(id!==variant){ variant=id; plan=loadPlan(id); history=[]; document.getElementById('undo').disabled=true; } save(); render(); }
 function sortDay(d){ d.items.sort((a,b)=>String(a.t).localeCompare(String(b.t))); }
 function isMacauPt(p){ return isFinite(p.lng)&&p.lng<113.75; }
@@ -1411,8 +1482,9 @@ function render(){
   const t=plan.trip||{};
   let macauDay=t.macau||"미정";
   if(custom){ const mi=plan.days.findIndex(d=>d.items.some(isMacauPt)); macauDay = mi>=0 ? "Day "+(mi+1) : "미정"; }
-  const fl=t.flights||{}; const st=[["여행 날짜",(t.dates&&t.dates.label)||"미정"],["숙소","셩완 · 3박 고정"],["항공편",[fl.in&&fl.in.code,fl.out&&fl.out.code].filter(Boolean).join(" / ")||"미정"],["마카오 가는 날",macauDay]];
-  document.getElementById('status').innerHTML=st.map(([k,v])=>`<div class="stat ${/미정|임시/.test(v)?'todo':''}"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('');
+  const fl=t.flights||{}, L0=lodgingOf(), nights=plan.days.length>1?`${plan.days.length-1}박`:"";
+  const st=[["여행 날짜",tripDatesLabel()],["숙소",L0.isDefault?`셩완 · ${nights||'3박'} (임시)`:`${L0.name} · ${L0.area}${nights?' · '+nights:''}`],["항공편",[fl.in&&fl.in.code,fl.out&&fl.out.code].filter(Boolean).join(" / ")||"미정"],["마카오 가는 날",macauDay]];
+  document.getElementById('status').innerHTML=st.map(([k,v])=>`<div class="stat ${/미정|임시/.test(v)?'todo':''}${custom?' edit':''}"${custom?' role="button" tabindex="0" title="눌러서 여행 정보 수정"':''}><div class="k">${esc(k)}${custom?' <span aria-hidden="true">✎</span>':''}</div><div class="v">${esc(v)}</div></div>`).join('');
   document.getElementById('picker').innerHTML=PLANS.map(p=>`<button type="button" class="pick${p.id===variant?' on':''}" data-id="${p.id}" aria-pressed="${p.id===variant}"><span class="o">${esc(p.ord)}</span><span class="n">${esc(p.name)}</span></button>`).join('');
   document.getElementById('pickdesc').innerHTML=esc(P.desc)+(custom?'':' <button class="linkbtn" type="button" id="copyToMine">이 여정을 바탕으로 직접 꾸미기 →</button>');
   const isMac=d=>d.macau||(custom&&d.items.some(isMacauPt));
@@ -1422,7 +1494,7 @@ function render(){
     const sec=document.createElement('section'); sec.id='d'+(di+1);
     const keyIt=d.items.find(x=>x.key&&!x.hotel);
     const keyCard=custom?(keyIt?{name:keyIt.n,why:keyIt.why}:null):d.key;
-    const sub=custom?`${d.items.length}곳 · 오늘의 한 곳 ${keyIt?keyIt.n:'미정'}`:(d.sub||'');
+    const sub0=custom?`${d.items.length}곳 · 오늘의 한 곳 ${keyIt?keyIt.n:'미정'}`:(d.sub||''); const dd=dayDate(di); const sub=dd?(dd+(sub0?' · '+sub0:'')):sub0;
     sec.innerHTML=`<div class="dayhead"><div class="daynum">${String(di+1).padStart(2,'0')}</div><h2>${esc(d.title)}</h2><div class="sub">${esc(sub)}</div></div>`
       +(custom?`<div class="dayact"><button class="ghost addbtn" type="button" data-day="${di+1}">＋ 장소 넣기</button>${d.items.some(x=>!x.hotel)?'':'<span class="hint">아직 비어 있어요. 장소를 골라 넣어 보세요.</span>'}</div>`:'')
       +(isMac(d)?`<div class="callout"><b>날짜 고정 예정</b> 마카오 행사 날짜가 정해지면 토끼에게 "마카오를 Day ○로 옮겨줘"라고 하세요. 11월 하순 그랑프리 기간엔 도로 통제와 페리 혼잡이 있을 수 있어요.</div>`:'')
@@ -1442,12 +1514,12 @@ function render(){
     host.appendChild(sec);
     let pins=clusterPins(d.items.map((x,k)=>({...x,i:k+1})).filter(x=>!x.hotel));
     const hk=pins.length&&pins[0].lng>113.8;
-    if(hk) pins.push({...HOTEL,hotel:true,t:"3박 고정",why:"마카오 페리터미널(신덕센터) 바로 옆이에요."});
+    if(hk) pins.push({n:L0.name,q:L0.q,lat:L0.lat,lng:L0.lng,hotel:true,t:nights||"숙소",why:L0.isDefault?"마카오 페리터미널(신덕센터) 바로 옆이에요.":`${L0.area} 숙소`});
     const mapEl=sec.querySelector('.map');
     if(pins.length) mount('d'+(di+1),mapEl,{pins}); else sec.querySelector('.mapbox').hidden=true;
   });
   // overview
-  const ov=[{n:"홍콩국제공항",q:"Hong Kong International Airport",lat:22.3080,lng:113.9185,i:"✈",why:"공항철도로 홍콩역까지 약 24분"},{...HOTEL,hotel:true,t:"3박 고정",why:"마카오 페리터미널 바로 옆"}];
+  const ov=[{n:"홍콩국제공항",q:"Hong Kong International Airport",lat:22.3080,lng:113.9185,i:"✈",why:"공항철도로 홍콩역까지 약 24분"},{n:L0.name,q:L0.q,lat:L0.lat,lng:L0.lng,hotel:true,t:nights||"숙소",why:L0.isDefault?"마카오 페리터미널 바로 옆":`${L0.area} 숙소`}];
   plan.days.forEach((d,di)=>{const k=d.items.find(x=>x.key&&!x.hotel&&isFinite(x.lat))||d.items.find(x=>!x.hotel&&isFinite(x.lat)&&x.q!=="Hong Kong International Airport"&&x.q!=="Hong Kong Station Airport Express"); if(k) ov.push({n:`Day ${di+1} · ${k.n}`,q:k.q,lat:k.lat,lng:k.lng,i:di+1,key:true,why:(custom?'':(d.key?d.key.name:''))});});
   mount('ov',document.getElementById('map-overview'),{pins:ov,fit:[[22.09,113.50],[22.36,114.24]],
     lines:[[[22.2885,114.1505],[22.282,114.10],[22.255,114.02],[22.235,113.86],[22.205,113.66],[22.1975,113.5605]],[[22.3080,113.9185],[22.325,113.985],[22.322,114.06],[22.305,114.135],[22.2849,114.1582]]],
@@ -1477,7 +1549,7 @@ function ioMsg(t){ const el=document.getElementById('ioMsg'); el.textContent=t||
 function downloadBlob(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); }
 async function exportDoc(){
   const meta=currentMeta();
-  const doc={kind:"tokki-trip",v:DOC_V,exportedAt:new Date().toISOString(),tripId:variant,title:meta.ord+" · "+meta.name,owner:travelerName()||undefined,data:plan};
+  const doc={kind:"tokki-trip",v:DOC_V,exportedAt:new Date().toISOString(),tripId:variant,title:plan.title||(meta.ord+" · "+meta.name),owner:travelerName()||undefined,data:plan};
   const name=`토끼의여정-${variant}-${new Date().toISOString().slice(0,10)}.json`;
   const blob=new Blob([JSON.stringify(doc,null,1)],{type:"application/json"});
   try{
@@ -1490,13 +1562,14 @@ async function exportDoc(){
 function validateDoc(p){
   const S=(v,n)=>String(v==null?"":v).replace(/[\u0000-\u001f]/g,"").slice(0,n);
   if(!p||typeof p!=="object"||!Array.isArray(p.days)||!p.days.length) throw new Error("여정 파일이 아니에요");
-  const out={trip:{},days:[]};
+  const out={trip:{},days:[]}; if(p.title) out.title=S(p.title,40);
   const t=p.trip&&typeof p.trip==="object"?p.trip:{};
   out.trip.dates=typeof t.dates==="string"?{label:S(t.dates,60)}:{label:S(t.dates&&t.dates.label,60),start:t.dates&&t.dates.start?S(t.dates.start,10):undefined,end:t.dates&&t.dates.end?S(t.dates.end,10):undefined};
   const fl=t.flights&&typeof t.flights==="object"?t.flights:{};
   out.trip.flights={in:fl.in&&fl.in.code?{code:S(fl.in.code,20)}:(t.flightIn?{code:S(t.flightIn,20)}:null),out:fl.out&&fl.out.code?{code:S(fl.out.code,20)}:(t.flightOut?{code:S(t.flightOut,20)}:null)};
   if(t.macau) out.trip.macau=S(t.macau,30);
   if(t.party&&typeof t.party==="object") out.trip.party={type:S(t.party.type,10)||"모녀"};
+  const L=Array.isArray(t.lodging)&&t.lodging[0]; if(L&&L.name&&isFinite(+L.lat)&&isFinite(+L.lng)) out.trip.lodging=[{name:S(L.name,60),area:S(L.area,20),q:S(L.q||L.name,120),lat:+L.lat,lng:+L.lng}];
   out.days=p.days.slice(0,30).map(d=>{ d=d&&typeof d==="object"?d:{};
     const items=(Array.isArray(d.items)?d.items:[]).filter(it=>it&&typeof it==="object"&&isFinite(+it.lat)&&isFinite(+it.lng)&&Math.abs(+it.lat)<=90&&Math.abs(+it.lng)<=180).slice(0,50)
       .map(it=>({t:S(it.t,5),n:S(it.n,80),q:S(it.q||it.n,120),lat:+it.lat,lng:+it.lng,why:S(it.why,500),note:it.note?S(it.note,500):undefined,key:!!it.key,hotel:it.hotel?true:undefined,origin:["me","suzi","template"].includes(it.origin)?it.origin:"me"}));
@@ -1522,6 +1595,27 @@ document.getElementById('importFile').onchange=async e=>{
 };
 document.getElementById('importYes').onclick=()=>{ if(importPending) applyImport(importPending); };
 document.getElementById('importNo').onclick=()=>{ importPending=null; document.getElementById('importConfirm').hidden=true; };
+
+// ---- 여행 정보 시트 (M2a) ----
+const tripsheet=document.getElementById('tripsheet');
+function statusHint(t){ const el=document.getElementById('statusHint'); el.textContent=t||''; el.hidden=!t; if(t) setTimeout(()=>{ if(el.textContent===t) el.hidden=true; },6000); }
+function openTrip(){
+  const t=plan.trip, L=t.lodging[0]||{}, f=document.getElementById('tripform');
+  f.querySelector('#tTitle').value=plan.title||''; f.querySelector('#tStart').value=t.dates.start||''; f.querySelector('#tEnd').value=t.dates.end||'';
+  f.querySelector('#tIn').value=(t.flights.in&&t.flights.in.code)||''; f.querySelector('#tOut').value=(t.flights.out&&t.flights.out.code)||'';
+  f.querySelector('#tLodge').value=L.name||''; const sel=f.querySelector('#tArea'); sel.innerHTML=Object.keys(LODGE_AREAS).map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join(''); sel.value=LODGE_AREAS[L.area]?L.area:"셩완";
+  f.querySelector('#tParty').value=(t.party&&t.party.type)||"모녀"; updateDaysNote();
+  tripsheet.hidden=false; scrim.hidden=false; fab.hidden=true; setTimeout(()=>f.querySelector('#tTitle').focus(),50);
+}
+function closeTrip(){ tripsheet.hidden=true; scrim.hidden=true; fab.hidden=false; }
+function updateDaysNote(){ const f=document.getElementById('tripform'), a=parseYMD(f.querySelector('#tStart').value), b=parseYMD(f.querySelector('#tEnd').value), el=f.querySelector('#tDaysNote'); if(a&&b&&b>=a){ const n=dayCountBetween(a,b); el.textContent=`${n-1}박 ${n}일 · 지금 Day ${plan.days.length}개${n!==plan.days.length?` → Day ${n}개로 맞춰요`:''}`; el.hidden=false; } else if(a&&b){ el.textContent='종료일이 시작일보다 빨라요'; el.hidden=false; } else el.hidden=true; }
+document.getElementById('tStart').addEventListener('change',updateDaysNote); document.getElementById('tEnd').addEventListener('change',updateDaysNote);
+document.getElementById('tripClose').onclick=closeTrip; document.getElementById('tripCancel').onclick=closeTrip;
+document.getElementById('tripform').onsubmit=e=>{ e.preventDefault(); const f=e.target; const a=parseYMD(f.querySelector('#tStart').value), b=parseYMD(f.querySelector('#tEnd').value); if(a&&b&&b<a){ updateDaysNote(); return; }
+  snapshot(); const note=setTripFields({title:f.querySelector('#tTitle').value,start:f.querySelector('#tStart').value,end:f.querySelector('#tEnd').value,flight_in:f.querySelector('#tIn').value.trim(),flight_out:f.querySelector('#tOut').value.trim(),lodging_name:f.querySelector('#tLodge').value,lodging_area:f.querySelector('#tArea').value,party:f.querySelector('#tParty').value});
+  save(); render(); closeTrip(); statusHint(note?`여행 정보를 저장했어요 · ${note}`:'여행 정보를 저장했어요'); };
+document.getElementById('status').addEventListener('click',()=>{ if(currentMeta().custom) openTrip(); else statusHint('추천 여정이에요. 아래 "이 여정을 바탕으로 직접 꾸미기"를 누르면 날짜·숙소를 적을 수 있어요'); });
+document.getElementById('status').addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&currentMeta().custom){ e.preventDefault(); openTrip(); } });
 
 // ---- 여정 고르기 ----
 document.getElementById('picker').onclick=e=>{ const b=e.target.closest('.pick'); if(b) switchPlan(b.dataset.id); };
@@ -1578,7 +1672,7 @@ const infosheet=document.getElementById('infosheet');
 function openInfo(it){
   const inf=infoOf(it.q), kind=kindOf(it), hotel=kind==="호텔";
   document.getElementById('infoKind').textContent=kind;
-  document.getElementById('infoTitle').textContent=hotel?"숙소 (셩완)":it.n;
+  const L0=lodgingOf(); document.getElementById('infoTitle').textContent=hotel?(L0.isDefault?"숙소 (셩완)":L0.name+" · "+L0.area):it.n;
   document.getElementById('infoSub').textContent=[areaOf(it), it.t?('일정 '+it.t):''].filter(Boolean).join(' · ');
   const hoursLabel = kind==="페리"?"운항":(kind==="교통"?"운행":(hotel?"시간":"영업시간"));
   const rows=[[hoursLabel,inf.hours],["요금",inf.fee],["팁",inf.tip]].filter(r=>r[1]);
@@ -1597,7 +1691,7 @@ function openInfo(it){
   document.getElementById('infoBody').innerHTML=html;
   infosheet.hidden=false; scrim.hidden=false; fab.hidden=true;
   const el=document.getElementById('infomap');
-  if(isFinite(it.lat)&&isFinite(it.lng)){ try{ const pos=stopById(it.id); mount('info',el,{pins:[{...it,i:pos?pos.k+1:1,hotel:hotel}]}); setTimeout(()=>LIVE.info&&LIVE.info.invalidateSize(),60); }catch(e){ el.hidden=true; } }
+  if(isFinite(it.lat)&&isFinite(it.lng)){ try{ const pos=stopById(it.id); mount('info',el,{pins:[{...it,...(hotel?{lat:L0.lat,lng:L0.lng,q:L0.q,n:L0.name}:{}),i:pos?pos.k+1:1,hotel:hotel}]}); setTimeout(()=>LIVE.info&&LIVE.info.invalidateSize(),60); }catch(e){ el.hidden=true; } }
   else el.hidden=true;
   const ah=document.getElementById('askHotel'); if(ah) ah.onclick=()=>{ closeInfo(); openSheet(); ask(CHIPS[0][1]); };
   const af=document.getElementById('askFerry'); if(af) af.onclick=()=>{ closeInfo(); openSheet(); ask(`${it.n} 페리 운항 시간표, 소요 시간, 예매 방법과 요금을 알려줘. 모녀가 편하게 타는 팁도.`); };
@@ -1625,9 +1719,9 @@ document.getElementById('chips').onclick=e=>{const b=e.target.closest('.chip'); 
 
 function openSheet(){ sheet.hidden=false; scrim.hidden=false; fab.hidden=true; if(!log.children.length){ if(!loadChat()) hello(); } setTimeout(()=>q.focus(),50); }
 function closeSheet(){ sheet.hidden=true; scrim.hidden=true; fab.hidden=false; fab.focus(); }
-fab.onclick=openSheet; document.getElementById('close').onclick=closeSheet; scrim.onclick=()=>{ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); };
+fab.onclick=openSheet; document.getElementById('close').onclick=closeSheet; scrim.onclick=()=>{ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); };
 document.getElementById('fnLink').onclick=()=>closeSheet();
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); } });
 
 function bubble(cls,html){ const d=document.createElement('div'); d.className='msg '+cls; d.innerHTML=html; log.appendChild(d); log.scrollTop=log.scrollHeight; return d; }
 function md(s){
@@ -1798,7 +1892,7 @@ function compactPlan(){
   return JSON.stringify({trip:plan.trip, days:plan.days.map((d,i)=>({day:i+1,title:d.title,macau:!!d.macau,key:d.key&&d.key.name,items:d.items.map((it,j)=>({id:it.id,idx:j+1,t:it.t,n:it.n}))}))});
 }
 const RULES=()=>`너는 "토끼"야. ${travelerName()?`여행자 이름은 "${travelerName()}"이고, `:""}엄마와 딸의 홍콩·마카오 3박 4일 여행을 돕는 다정하고 센스 있는 토끼 여행 도우미야. 자신을 부를 땐 "토끼"라고 해.
-[여행 조건] 11월 말 3박 4일, 숙소는 셩완 마카오 페리터미널(신덕센터) 근처 3박 고정, 하루 핵심 장소 1곳(최대 2곳) 원칙의 여유로운 일정, 엄마는 하루 1~1.5만 보 가능, 관심사는 딤섬·애프터눈티, 야경·뷰포인트, 감성 포토스팟·문화. 마카오는 하루, 날짜는 행사에 맞춰 나중에 고정.
+${tripBrief()} 날짜·항공편·숙소가 미정이면 사용자가 알려줄 때 set_trip_info로 적어 줘.
 [주요 주제] 호텔, 경로, 명소, 항공권, 요즘 여행 핫 키워드.
 [답변 규칙] 한국어 존댓말, 휴대폰 화면 기준 짧게(최대 10줄 안팎), 필요하면 '- ' 목록. 실시간 검색을 못 하니 가격·운항편·영업시간·최신 트렌드는 '최근 기준 확인 필요'라고 짧게 밝혀. 모르는 건 지어내지 마. 토끼다운 말투는 한 답변에 한 번 정도만 살짝(예: 깡총).
 [일정 반영] 사용자가 넣어줘/바꿔줘/빼줘/옮겨줘처럼 일정 변경을 요청할 때만 도구를 써. 장소를 고치거나 뺄 땐 현재 일정 JSON의 id를 stop_id로 넘겨(순번은 변경 뒤 바뀔 수 있어). 도구가 돌려준 items가 최신 상태야. 장소를 넣을 땐 실제 위치에 가까운 위도·경도와 구글지도 검색어(영문)를 함께 넣고, 하루 핵심 1곳 원칙이 깨지지 않게 해. 변경 후엔 무엇을 바꿨는지 한두 줄로 알려줘.${toolsOK?'':' (이번 화면에선 일정 직접 수정이 안 되니, 바꿀 내용을 말로만 제안해.)'}
@@ -1839,9 +1933,10 @@ const TOOLS=[
   execute(i){ const it=findItemByName(i.name); if(!it) throw new Error("그 이름의 장소를 찾지 못했어요"); const q=it.q||it.n; const ed=INFO_EDIT[q]||{};
     if(i.hours) ed.hours=String(i.hours); if(i.fee) ed.fee=String(i.fee); if(i.tip) ed.tip=String(i.tip); ed.asOf=new Date().toISOString().slice(0,10);
     INFO_EDIT[q]=ed; saveInfoEdit(); if(!infosheet.hidden) openInfo(it); return {updated:it.n, fields:Object.keys(ed)}; }},
- {name:"set_trip_info",description:"상단 여행 정보(날짜, 가는 편, 오는 편, 마카오 가는 날)를 갱신해. 바꿀 필드만 보내.",
-  inputSchema:{type:"object",properties:{dates:{type:"string"},flight_in:{type:"string"},flight_out:{type:"string"},macau:{type:"string"}}},
-  execute(i){ snapshot(); const t=plan.trip; if(i.dates) t.dates={...(t.dates||{}),label:String(i.dates)}; if(i.flight_in) t.flights.in={...(t.flights.in||{}),code:String(i.flight_in)}; if(i.flight_out) t.flights.out={...(t.flights.out||{}),code:String(i.flight_out)}; if(i.macau) t.macau=String(i.macau); save(); render(); return {ok:true}; }}
+ {name:"set_trip_info",description:"여행 기본정보를 갱신해. 바꿀 필드만 보내. start/end는 YYYY-MM-DD(넣으면 Day 수가 그에 맞게 조정됨). lodging_area는 셩완·센트럴·완차이·코즈웨이베이·침사추이·조던·야우마테이·몽콕·마카오 중 하나. 반환: 갱신 결과와 Day 수.",
+  inputSchema:{type:"object",properties:{title:{type:"string"},dates:{type:"string",description:"날짜를 모를 때의 설명 문구 (예: 11월 말)"},start:{type:"string"},end:{type:"string"},flight_in:{type:"string"},flight_out:{type:"string"},lodging_name:{type:"string"},lodging_area:{type:"string"},party:{type:"string",description:"모녀|가족|부부|친구|혼자"},macau:{type:"string"}}},
+  execute(i){ snapshot(); const f={}; if(i.title!==undefined) f.title=i.title; if(i.dates) f.label=i.dates; if(i.start!==undefined) f.start=String(i.start); if(i.end!==undefined) f.end=String(i.end); if(i.flight_in!==undefined) f.flight_in=i.flight_in; if(i.flight_out!==undefined) f.flight_out=i.flight_out; if(i.lodging_name!==undefined) f.lodging_name=i.lodging_name; if(i.lodging_area!==undefined) f.lodging_area=i.lodging_area; if(i.party!==undefined) f.party=i.party;
+    const note=setTripFields(f); if(i.macau) plan.trip.macau=String(i.macau); save(); render(); return {ok:true,dates:tripDatesLabel(),days:plan.days.length,note:note||undefined}; }}
 ];
 
 const ERR={not_granted:"토끼 도우미 사용이 허용되지 않았어요. 아티팩트에선 권한에서 Claude 사용을 허용하고, 외부 서버·키 방식에선 연결 설정의 주소·토큰·키를 확인해 주세요.",invalid_request:"요청 형식이 맞지 않아요. 연결 설정의 모델 이름을 확인해 주세요.",upstream_error:"서버가 잠깐 불안정해요. 조금 뒤 다시 보내 주세요.",empty_completion:"답을 만들지 못했어요. 질문을 조금 바꿔 다시 물어봐 주세요.",sampling_disabled:"이 계정에서는 토끼 도우미를 쓸 수 없어요.",rate_limited:"질문이 많아 잠깐 쉬어야 해요. 조금 뒤 다시 물어봐 주세요.",session_expired:"로그인이 만료됐어요. 다시 로그인해 주세요.",refused:"이 질문에는 답하기 어려워요. 다르게 물어봐 주세요.",prompt_too_large:"대화가 너무 길어졌어요. 페이지를 새로 열고 다시 물어봐 주세요."};
