@@ -52,8 +52,8 @@ API 키를 HTML에 넣으면 받는 사람 모두에게 키가 노출되므로, 
 쓰기(POST/PUT)는 `ALLOWED_ORIGIN`에서만, 읽기(GET)는 누구나(링크를 받은 사람). IP당 제한: 일반 30회/분, 사진 올리기 120회/분.
 
 ### R2 켜기 (사진 공유)
-R2는 계정에서 한 번 활성화해야 한다(대시보드 → R2 → 결제 수단 등록, 무료 한도 10GB/월).
+(2026-10-16 완료) R2는 계정에서 한 번 활성화해야 한다(대시보드 → R2 → 구독 추가, 무료 한도 10GB/월). 다시 만들 때의 절차:
 1. `npx wrangler r2 bucket create tokki-photos`
-2. `npx wrangler r2 bucket lifecycle add tokki-photos --expire-days 90`
+2. `npx wrangler r2 bucket lifecycle add tokki-photos expire-90d --expire-days 90`
 3. `wrangler.toml`의 `[[r2_buckets]]` 세 줄 주석 해제 → `npx wrangler deploy`
 Worker는 바인딩이 없으면 `photos:false`를 돌려주고 페이지는 "사진 포함" 선택지를 숨긴다.

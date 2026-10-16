@@ -27,10 +27,10 @@ id = "daff4387d6464e768a592b0957d23f0a"
 
 # 공유 사진 보관(R2, 수명주기 90일). R2는 대시보드에서 한 번 활성화해야 한다(결제 수단 등록, 무료 한도 10GB).
 # 활성화한 뒤: npx wrangler r2 bucket create tokki-photos && npx wrangler r2 bucket lifecycle add tokki-photos --expire-days 90
-# 그다음 아래 세 줄의 주석을 풀고 npx wrangler deploy. Worker는 바인딩이 없으면 사진 기능만 끄고 돈다.
-# [[r2_buckets]]
-# binding = "PHOTOS"
-# bucket_name = "tokki-photos"
+# (2026-10-16 활성화 완료) Worker는 바인딩이 없으면 사진 기능만 끄고 돈다.
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "tokki-photos"
 
 # 실행 위치 고정: Anthropic API는 홍콩(HKG) 발신을 403으로 막는다. 사용자가 홍콩·마카오에 있어도 Worker는 도쿄에서 돌게 한다.
 [placement]

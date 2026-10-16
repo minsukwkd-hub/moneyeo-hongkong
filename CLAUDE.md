@@ -5,7 +5,7 @@
 ## 현재 산출물
 - `index.html` — 단일 파일 앱(모녀 홍콩·마카오 3박4일). CSS 토큰 → 인라인 Leaflet CSS → 페이지 CSS → 본문 → 시트(SUZI·장소 넣기·장소 정보) → `<script>`.
 - 배포: GitHub Pages https://minsukwkd-hub.github.io/moneyeo-hongkong/ (이 저장소 `main` 루트, push 후 1~2분 자동 반영).
-- `suzi-proxy/` — Cloudflare Worker: 토끼 프록시(API 키 보관, Origin·IP당 30회/분) + 공유 서버(`POST /share`·`GET /s/<code>` KV 90일, `PUT|GET /p/<code>/<id>` R2 사진). `wrangler.toml` 포함. `npx wrangler deploy`. **R2는 대시보드 활성화 전까지 주석**(README 참고).
+- `suzi-proxy/` — Cloudflare Worker: 토끼 프록시(API 키 보관, Origin·IP당 30회/분) + 공유 서버(`POST /share`·`GET /s/<code>` KV 90일, `PUT|GET /p/<code>/<id>` R2 사진). `wrangler.toml` 포함. `npx wrangler deploy`. KV `SHARE`(코드 90일)·R2 `tokki-photos`(수명주기 90일) 바인딩 운영 중.
 - `suzi-proxy-vercel/` — 같은 프록시의 Vercel Edge Function 버전(대안).
 - `deploy.ps1` — GitHub Pages 최초 배포 스크립트(이미 배포됨, 참고용).
 - `manifest.webmanifest`, `icons/` — 홈 화면 앱(PWA) 설정과 아이콘. 설치 안내 띠는 `paintInstall()`.
@@ -32,7 +32,7 @@
 ## 진행 상태 (2026-10-16)
 - SUZI 프록시: **Cloudflare Worker 운영 중, 종단 검증 완료** https://suzi-proxy.suzi-proxy.workers.dev/ (계정 이메일 minsukwkd+cf@gmail.com). 시크릿은 `ANTHROPIC_API_KEY` 하나. **서버 토큰은 쓰지 않기로 결정**(Origin 제한·IP당 30회/분·월 한도로 방어). **실행 위치는 도쿄 고정(`[placement] region`)** — Anthropic이 홍콩(HKG) 발신을 403으로 막기 때문. 이 설정을 지우면 홍콩 현지에서 SUZI가 죽는다. Vercel 배포본(https://suzi-proxy.vercel.app/api/suzi, hnd1 고정)은 예비.
 - `SUZI_DEFAULT.url`은 Cloudflare 주소, `token`은 빈 값이 정상. 저장된 연결 설정은 사용자가 직접 바꾼 경우(`custom:true`)가 아니면 항상 `SUZI_DEFAULT`를 따른다.
-- 설계: `docs/설계.md`(v3, 개정 2)가 장기 구조·데이터 모델·착수 순서(M0~M4)의 기준. **M0·M1·M2 완료**(이름/토끼 호칭/인앱 띠 · 모델 v3+repo+SUZI id 도구 · 내보내기/불러오기 · 여행 정보 시트 · ▲▼ 순서/이동시간/부하 경고 · 직접 장소/챙김 메모). **M3 완료**(사진·공유 링크·기록·여행 목록 홈). **M4 1단계 완료**: 짧은 공유 코드 `#c=<code>`(Worker KV, 90일), 서버 실패 시 `#s=` 긴 링크로 복귀. 사진 포함 공유는 코드·클라이언트 준비됨, R2 활성화(사용자) 대기. 공유 시트는 사용자 탭 안에서만 열려 "링크 만들기 → 보내기" 두 단계.
+- 설계: `docs/설계.md`(v3, 개정 2)가 장기 구조·데이터 모델·착수 순서(M0~M4)의 기준. **M0·M1·M2 완료**(이름/토끼 호칭/인앱 띠 · 모델 v3+repo+SUZI id 도구 · 내보내기/불러오기 · 여행 정보 시트 · ▲▼ 순서/이동시간/부하 경고 · 직접 장소/챙김 메모). **M3 완료**(사진·공유 링크·기록·여행 목록 홈). **M4 완료**: 짧은 공유 코드 `#c=<code>`(Worker KV, 90일) + 사진 포함 공유(R2, 코드당 최대 30장, 90일). 서버 실패 시 `#s=` 긴 링크로 복귀. 공유 시트는 사용자 탭 안에서만 열려 "링크 만들기 → 보내기" 두 단계.
 - 여행 목록: `tokki-trips-v1` `{cur,ids}`; `U`는 현재 내 여행 포인터(`realTripId`), 저장 키 `tokki-trip:<id>`, 사진 tripId도 실제 id. 불러오기·복사는 `placeIntoMine`(빈 여행이면 그 자리, 아니면 새 여행). 시트 `#listsheet`, 도구 list_trips/open_trip/new_trip. **추천 여정(A/B/C)은 보기 전용**(2026-10-16 결정): 항상 원본 로드·저장 없음·기록/사진/편집 UI 없음, SUZI 변경 도구는 `EDIT_TOOLS` 래퍼로 거절, 복사는 `import_template` 또는 "바탕으로 직접 꾸미기".
 - 기록(M3b): `Stop.status|memo|cost{amount,cur}`, `Day.expenses[]`, `Day.journal{text,mood}`. 통화 HKD·MOP·KRW, 합계는 통화별(`spendOf`). 시트 `#recsheet`(장소 기록)·`#exsheet`(Day 지출)·`#journalsheet`(일기). 받은 여정(S)에서는 기록 불가. 공유 링크엔 안 실리고 내보내기엔 실린다. SUZI 도구 mark_visited / add_expense / set_journal.
 - 공유 링크(M3a): `toSlim`/`fromSlim`(슬림 포맷 v1) → deflate-raw → base64url → `#s=`(압축 불가 브라우저는 `#j=`). 받는 쪽은 부팅 때 해시를 풀어 "받은 여정"(variant `S`, `SHARED.meta`, 저장 안 함)으로 보여 주고 "내 여정으로 가져오기"로 `applyImport`. 1,800자 초과면 파일 내보내기로 전환. 주의: 스크립트 안 `history`는 되돌리기 스택이므로 브라우저 히스토리는 반드시 `window.history`로 부른다.
