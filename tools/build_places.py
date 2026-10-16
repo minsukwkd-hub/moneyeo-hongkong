@@ -244,7 +244,7 @@ def build():
             if lat is None or lon is None: continue
             lat = float(lat); lon = float(lon)
             if lat > 22.535 or (lat > 22.47 and lon < 114.09): continue  # 선전
-            if t.get("tourism") == "hotel" and not (t.get("stars") or t.get("wikidata") or t.get("name:ko")): continue  # 이름만 있는 작은 숙소는 제외
+            # 호텔은 모두 넣는다(숙소 검색용, 2026-10-16). 영문·한국어·한자 이름 중 하나는 있어야 함
             nm_all = " ".join([t.get("name", ""), t.get("name:en", "")])
             if re.search(r"sitting-out|sitting out|rest garden|playground|boundary stone|sports ground|football pitch|basketball|休憩|遊樂場|球場|界石", nm_all, re.I): continue  # 동네 쉼터·운동장 등 여행과 무관한 곳
             q = t.get("wikidata", ""); w = wd.get(q) if q else None

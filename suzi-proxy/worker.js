@@ -38,6 +38,11 @@ export default {
       let m;
       if ((m = path.match(/^\/s\/([a-z0-9]{6,10})$/))) return getShare(env, m[1]);
       if ((m = path.match(/^\/p\/([a-z0-9]{6,10})\/([a-z0-9_]{4,22})$/))) return getPhoto(env, m[1], m[2]);
+      if (path === "/flights") {
+        const ip = req.headers.get("cf-connecting-ip") || "unknown";
+        if (!(await allow(env.SUZI_RL, ip))) return json({ error: { message: "rate limited" } }, 429);
+        return getFlights(url);
+      }
       // 기능 안내: 페이지가 공유 코드·사진 올리기를 지원하는지 확인할 때 쓴다
       return json({ ok: true, service: "tokki", share: !!env.SHARE, photos: !!(env.PHOTOS && env.SHARE), ttlDays: SHARE_TTL / 86400 }, 200);
     }
@@ -160,6 +165,35 @@ async function getPhoto(env, code, id) {
   h.set("cache-control", "public, max-age=31536000, immutable");
   h.set("etag", obj.httpEtag || "");
   return new Response(obj.body, { status: 200, headers: h });
+}
+
+// 홍콩공항(HKIA) 공개 운항 정보: 과거 90일 ~ 앞으로 14일. 브라우저에서 직접 못 불러서(CORS 없음) 여기서 중계하고 5분 캐시한다.
+//   GET /flights?date=YYYY-MM-DD&no=ZE861  → { date, found:[{dir:"arr"|"dep", no, airline, time, status, origin, destination, terminal, gate, hall, baggage}], updated }
+async function getFlights(url) {
+  const date = url.searchParams.get("date") || "", no = (url.searchParams.get("no") || "").toUpperCase().replace(/\s+/g, "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: { message: "date=YYYY-MM-DD" } }, 400);
+  if (!/^[A-Z0-9]{2}\d{1,4}[A-Z]?$/.test(no)) return json({ error: { message: "no=항공사코드+편명 (예: ZE861)" } }, 400);
+  const cache = caches.default; const key = new Request(`https://tokki.cache/flights?date=${date}&no=${no}`);
+  const hit = await cache.match(key); if (hit) return hit;
+  const found = []; let updated = "";
+  for (const dir of ["arr", "dep"]) {
+    const src = `https://www.hongkongairport.com/flightinfo-rest/rest/flights/past?date=${date}&lang=en&cargo=false&arrival=${dir === "arr"}`;
+    let data = null;
+    try { const r = await fetch(src, { headers: { "User-Agent": "Mozilla/5.0 (tokki-trip)", "Accept": "application/json" } }); if (!r.ok) continue; data = await r.json(); } catch { continue; }
+    const day = (Array.isArray(data) ? data : [data]).find(d => d && d.date === date); if (!day) continue;
+    updated = day.lastUpdatedTime || updated;
+    for (const f of day.list || []) {
+      const codes = (f.flight || []).map(x => String(x.no || "").toUpperCase().replace(/\s+/g, ""));
+      if (!codes.includes(no)) continue;
+      const main = (f.flight || [])[0] || {};
+      found.push({ dir, no: String(main.no || no), airline: main.airline || "", codeshares: codes.filter(c => c !== no), time: f.time || "", status: f.status || "", statusCode: f.statusCode || null,
+        origin: f.origin || null, destination: f.destination || null, terminal: f.terminal || "", gate: f.gate || "", hall: f.hall || "", baggage: f.baggage || "", aisle: f.aisle || "" });
+    }
+  }
+  const res = json({ date, no, found, updated, src: "Hong Kong International Airport" }, 200);
+  res.headers.set("cache-control", "public, max-age=300");
+  try { await cache.put(key, res.clone()); } catch {}
+  return res;
 }
 
 function json(obj, status) {

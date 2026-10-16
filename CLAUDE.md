@@ -5,7 +5,7 @@
 ## 현재 산출물
 - `index.html` — 단일 파일 앱(모녀 홍콩·마카오 3박4일). CSS 토큰 → 인라인 Leaflet CSS → 페이지 CSS → 본문 → 시트(SUZI·장소 넣기·장소 정보) → `<script>`.
 - 배포: GitHub Pages https://minsukwkd-hub.github.io/moneyeo-hongkong/ (이 저장소 `main` 루트, push 후 1~2분 자동 반영).
-- `suzi-proxy/` — Cloudflare Worker: 토끼 프록시(API 키 보관, Origin·IP당 30회/분) + 공유 서버(`POST /share`·`GET /s/<code>` KV 90일, `PUT|GET /p/<code>/<id>` R2 사진). `wrangler.toml` 포함. `npx wrangler deploy`. KV `SHARE`(코드 90일)·R2 `tokki-photos`(수명주기 90일) 바인딩 운영 중.
+- `suzi-proxy/` — Cloudflare Worker: 토끼 프록시(API 키 보관, Origin·IP당 30회/분) + 공유 서버(`POST /share`·`GET /s/<code>` KV 90일, `PUT|GET /p/<code>/<id>` R2 사진) + `GET /flights`(홍콩공항 운항 정보 중계, 5분 캐시). `wrangler.toml` 포함. `npx wrangler deploy`. KV `SHARE`(코드 90일)·R2 `tokki-photos`(수명주기 90일) 바인딩 운영 중.
 - `suzi-proxy-vercel/` — 같은 프록시의 Vercel Edge Function 버전(대안).
 - `deploy.ps1` — GitHub Pages 최초 배포 스크립트(이미 배포됨, 참고용).
 - `manifest.webmanifest`, `icons/` — 홈 화면 앱(PWA) 설정과 아이콘. 설치 안내 띠는 `paintInstall()`.
@@ -15,6 +15,7 @@
 - 일정 데이터: `PLAN_A`(현재 여정) `PLAN_B`(조금 다른) `PLAN_C`(다른) `PLAN_U`(당신의 여정 = 직접 꾸미기 뼈대) → `PLANS` 배열. 저장: localStorage `suzi-hk-plan-v2:<id>`, 선택 여정 `suzi-hk-variant`.
 - 장소 사전: `CATALOG`(세 여정 + `EXTRA`에서 q 기준 중복 제거, `areaOf`로 지역 분류). 운영 정보: `INFO` (키 = 구글지도 검색어 q; `hours, fee, tip, site, siteName, src, upd, conf`). 기준일 `INFO_ASOF`. 사용자/SUZI 수정 오버레이 `INFO_EDIT` → `suzi-hk-info-v1`.
 - 렌더: `render()` 하나가 상단 상태·여정 선택 버튼·탭·Day 섹션·전체 지도를 모두 다시 그린다. 지도는 Leaflet(CDN 1.9.4) + OpenStreetMap 표준 타일(키 없음) + 내장 해안선 `LANDGEO`(타일을 못 받으면 해안선만) — 좌표는 홍콩·마카오 범위만 의미 있음. 하루 동선 점선, 겹침 핀 비켜 그리기, "◎ 내 위치" 버튼. CARTO 무료 타일은 키 없이는 워터마크라 쓰지 않는다.
+- 여행 정보 시트: 항공편은 편명→항공사 풀이 + Worker `GET /flights`(홍콩공항 공개 운항 정보, 과거 90일~14일 앞)로 시각·터미널 저장(`flights.in/out.sched…`), 숙소는 장소 사전 호텔 501곳·지도 찾기에서 골라 실제 좌표(`lodging.exact`) 저장.
 - 시트: SUZI(`#sheet`), 장소 넣기(`#addsheet`, 직접 꾸미기에서만, 직접 입력 폼 + 장소 사전 `data/places-hk.json`(OSM+Wikidata 13,400곳, 한국어 표기 6,800곳 중 대부분 AI 추정 `kosrc:ai`; 생성기 `tools/build_places.py`, 캐시 `tools/places_raw/`는 git 제외) + "지도에서 찾기"=Nominatim 직접 호출(홍콩/마카오 범위·버튼식) + 한국어로 못 찾으면 토끼(haiku, effort low)가 영문명으로 바꿔 재검색), 장소 정보(`#infosheet`, 제목 클릭), 여행 정보(`#tripsheet`, 상태 타일 클릭), 챙김 메모(`#bridgesheet`).
 - SUZI 연결 어댑터(`connect()`): ① claude.ai 아티팩트 `window.claude` sample → ② 외부 서버(`CONN.url`, Bearer 토큰) → ③ API 키 직접(테스트용). 설정은 ⚙, localStorage `suzi-hk-conn-v1`. 공유용 기본값은 `SUZI_DEFAULT` 상수.
 - SUZI 직접 호출(`apiChat`): Messages API 스트리밍(SSE) + 수동 tool loop. 모델 기본 `claude-opus-5-5`, `output_config.effort:"high"`, `fallbacks:"default"`(beta 헤더 `server-side-fallback-2026-07-01`). thinking 블록은 서명 포함 그대로 되돌려 보낸다.

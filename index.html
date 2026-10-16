@@ -1186,8 +1186,12 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
    <label>여행 이름 <input id="tTitle" type="text" maxlength="40" placeholder="예: 엄마랑 홍콩 3박 4일"></label>
    <div class="row"><label>시작일 <input id="tStart" type="date"></label><label>종료일 <input id="tEnd" type="date"></label></div>
    <p class="fine" id="tDaysNote" hidden></p>
-   <div class="row"><label>가는 편 <input id="tIn" type="text" maxlength="24" placeholder="예: 7C2101 08:30"></label><label>오는 편 <input id="tOut" type="text" maxlength="24" placeholder="예: 7C2102 15:40"></label></div>
-   <label>숙소 이름 <input id="tLodge" type="text" maxlength="60" placeholder="호텔 이름 (비워 두면 셩완 임시)"></label>
+   <div class="row"><label>가는 편 <input id="tIn" type="text" maxlength="24" placeholder="예: ZE861" autocapitalize="characters" autocomplete="off"></label><label>오는 편 <input id="tOut" type="text" maxlength="24" placeholder="예: ZE862" autocapitalize="characters" autocomplete="off"></label></div>
+   <p class="fine" id="tFlightHint" style="padding:0"></p>
+   <div class="row"><button class="ghost" type="button" id="tFlightFetch" disabled>홍콩공항 운항 정보 불러오기</button><span class="fine" id="tFlightNote" style="padding:0;flex:1;min-width:0"></span></div>
+   <label>숙소 이름 <input id="tLodge" type="text" maxlength="60" placeholder="호텔 이름 — 두 글자만 쳐도 찾아요 (비워 두면 셩완 임시)" autocomplete="off"></label>
+   <div class="geolist" id="tLodgeList" hidden></div>
+   <p class="fine" id="tLodgeNote" style="padding:0" hidden></p>
    <label>숙소 지역 <select id="tArea"></select></label>
    <label>동행 <select id="tParty"><option value="모녀">모녀</option><option value="가족">가족</option><option value="부부">부부</option><option value="친구">친구</option><option value="혼자">혼자</option></select></label>
    <div class="row"><button class="send" type="submit">저장</button><button class="ghost" type="button" id="tripCancel">취소</button></div>
@@ -1579,12 +1583,14 @@ function setTripFields(f){
   if(f.title!==undefined) plan.title=String(f.title).trim().slice(0,40)||undefined;
   if(f.start!==undefined||f.end!==undefined){ t.dates={...(t.dates||{}),start:parseYMD(f.start)?f.start:(f.start===""?undefined:t.dates.start),end:parseYMD(f.end)?f.end:(f.end===""?undefined:t.dates.end)}; }
   if(f.label!==undefined) t.dates={...(t.dates||{}),label:String(f.label).slice(0,60)};
-  if(f.flight_in!==undefined) t.flights.in=f.flight_in?{code:String(f.flight_in).slice(0,24)}:null;
-  if(f.flight_out!==undefined) t.flights.out=f.flight_out?{code:String(f.flight_out).slice(0,24)}:null;
+  const FLSET=(prev,code,info)=>{ const pf=parseFlightNo(code); if(pf) code=pf.no; return code?{...((prev&&prev.code===code)?prev:{}),code,...(info||{})}:null; }; // 편명은 'ZE861' 꼴로 정규화, 같으면 저장된 운항 정보 유지
+  if(f.flight_in!==undefined) t.flights.in=FLSET(t.flights.in,String(f.flight_in).trim().slice(0,24),f.flight_in_info);
+  if(f.flight_out!==undefined) t.flights.out=FLSET(t.flights.out,String(f.flight_out).trim().slice(0,24),f.flight_out_info);
   if(f.lodging_name!==undefined||f.lodging_area!==undefined){
     const cur=t.lodging[0]||{}; const name=f.lodging_name!==undefined?String(f.lodging_name).trim().slice(0,60):(cur.name||"");
     const area=LODGE_AREAS[f.lodging_area]?f.lodging_area:(LODGE_AREAS[cur.area]?cur.area:"셩완"); const ll=LODGE_AREAS[area];
-    t.lodging = name ? [{id:cur.id||newId(),name,area,q:name+" "+(area==="마카오"?"Macau":"Hong Kong"),lat:ll[0],lng:ll[1]}] : [];
+    const hasLL=isFinite(+f.lodging_lat)&&isFinite(+f.lodging_lng)&&inHK(+f.lodging_lat,+f.lodging_lng); // 사전·지도에서 고른 숙소는 실제 좌표에 핀
+    t.lodging = name ? [{id:cur.id||newId(),name,area,q:f.lodging_q?String(f.lodging_q).slice(0,120):(name+" "+(area==="마카오"?"Macau":"Hong Kong")),lat:hasLL?+(+f.lodging_lat).toFixed(5):ll[0],lng:hasLL?+(+f.lodging_lng).toFixed(5):ll[1],exact:hasLL||undefined}] : [];
   }
   if(f.party!==undefined) t.party={...(t.party||{}),type:["모녀","가족","부부","친구","혼자"].includes(f.party)?f.party:"모녀"};
   const a=tripStart(), b=tripEnd(); if(a&&b&&b>=a){ const n=dayCountBetween(a,b); if(n<=30) note=applyDayCount(n); }
@@ -1592,7 +1598,7 @@ function setTripFields(f){
 }
 function tripBrief(){
   const t=plan.trip||{}, L0=lodgingOf(), fl=t.flights||{}, party=(t.party&&t.party.type)||"모녀", n=plan.days.length;
-  return `[여행 조건] ${plan.title?`여행 이름 "${plan.title}", `:""}동행 ${party}, 기간 ${tripDatesLabel()}${n>1&&!/박/.test(tripDatesLabel())?` (${n-1}박 ${n}일)`:""}, 항공편 ${fl.in&&fl.in.code||"미정"} / ${fl.out&&fl.out.code||"미정"}, 숙소 ${L0.isDefault?"셩완 마카오 페리터미널(신덕센터) 근처(임시)":L0.name+" ("+L0.area+")"}. 하루 핵심 장소 1곳(최대 2곳) 원칙의 여유로운 일정, ${party==="모녀"?"엄마는 하루 1~1.5만 보 가능, ":""}관심사는 딤섬·애프터눈티, 야경·뷰포인트, 감성 포토스팟·문화. 마카오는 하루.`;
+  return `[여행 조건] ${plan.title?`여행 이름 "${plan.title}", `:""}동행 ${party}, 기간 ${tripDatesLabel()}${n>1&&!/박/.test(tripDatesLabel())?` (${n-1}박 ${n}일)`:""}, 항공편 ${fl.in?fl.in.code+(fl.in.sched?"(홍콩 "+fl.in.sched+" 도착)":""):"미정"} / ${fl.out?fl.out.code+(fl.out.sched?"(홍콩 "+fl.out.sched+" 출발)":""):"미정"}, 숙소 ${L0.isDefault?"셩완 마카오 페리터미널(신덕센터) 근처(임시)":L0.name+" ("+L0.area+")"}. 하루 핵심 장소 1곳(최대 2곳) 원칙의 여유로운 일정, ${party==="모녀"?"엄마는 하루 1~1.5만 보 가능, ":""}관심사는 딤섬·애프터눈티, 야경·뷰포인트, 감성 포토스팟·문화. 마카오는 하루.`;
 }
 // ---- 소요·이동시간 추정과 하루 부하 (M2b). 직선거리 기반의 대략값이며, 화면에는 "약"을 붙인다 ----
 const DUR_DEFAULT={"명소":90,"식당":75,"카페":45,"호텔":60,"페리":75,"교통":30,"전망":60,"쇼핑":60};
@@ -1766,7 +1772,7 @@ function render(){
     sb.innerHTML=`<b>${esc(SHARED&&SHARED.owner?SHARED.owner+'님이 보낸 여정':'링크로 받은 여정')}</b> 보기만 할 수 있어요.${phN?` 사진 ${phN}장이 함께 왔어요.`:''} 토끼에게 바꿔 달라고 해도 이 화면에서만 바뀌고 저장되지 않아요. `
       +(already?`<button class="linkbtn" type="button" id="sharedOpen">이미 가져왔어요 · 당신의 여정 열기 →</button> <button class="linkbtn" type="button" id="sharedImport">다시 가져오기</button>`:`<button class="linkbtn" type="button" id="sharedImport">내 여정으로 가져오기 →</button>`); }
   const fl=t.flights||{}, L0=lodgingOf(), nights=plan.days.length>1?`${plan.days.length-1}박`:"";
-  const st=[["여행 날짜",tripDatesLabel()],["숙소",L0.isDefault?`셩완 · ${nights||'3박'} (임시)`:`${L0.name} · ${L0.area}${nights?' · '+nights:''}`],["항공편",[fl.in&&fl.in.code,fl.out&&fl.out.code].filter(Boolean).join(" / ")||"미정"],["마카오 가는 날",macauDay]];
+  const st=[["여행 날짜",tripDatesLabel()],["숙소",L0.isDefault?`셩완 · ${nights||'3박'} (임시)`:`${L0.name} · ${L0.area}${nights?' · '+nights:''}`],["항공편",[fl.in&&(fl.in.code+(fl.in.sched?" "+fl.in.sched+"착":"")),fl.out&&(fl.out.code+(fl.out.sched?" "+fl.out.sched+"발":""))].filter(Boolean).join(" / ")||"미정"],["마카오 가는 날",macauDay]];
   document.getElementById('status').innerHTML=st.map(([k,v])=>`<div class="stat ${/미정|임시/.test(v)?'todo':''}${custom?' edit':''}"${custom?' role="button" tabindex="0" title="눌러서 여행 정보 수정"':''}><div class="k">${esc(k)}${custom?' <span aria-hidden="true">✎</span>':''}</div><div class="v">${esc(v)}</div></div>`).join('');
   const tCur=tripSummary(TRIPS.cur); document.getElementById('picker').innerHTML=PLANS.map(p=>`<button type="button" class="pick${p.id===variant?' on':''}" data-id="${p.id}" aria-pressed="${p.id===variant}"><span class="o">${esc(p.id==='U'&&TRIPS.ids.length>1?`내 여행 ${TRIPS.ids.indexOf(TRIPS.cur)+1}/${TRIPS.ids.length}`:p.ord)}</span><span class="n">${esc(p.id==='U'?(tCur.title||p.name):p.name)}</span></button>`).join('');
   document.getElementById('pickdesc').innerHTML=(custom?esc(P.desc)+' <button class="linkbtn" type="button" id="tripsOpen">여행 목록 →</button>':esc(P.desc))+(live?'':' <span class="hint">보기 전용이에요.</span> <button class="linkbtn" type="button" id="copyToMine">이 여정을 바탕으로 직접 꾸미기 →</button>');
@@ -1859,10 +1865,11 @@ function validateDoc(p){
   const t=p.trip&&typeof p.trip==="object"?p.trip:{};
   out.trip.dates=typeof t.dates==="string"?{label:S(t.dates,60)}:{label:S(t.dates&&t.dates.label,60),start:t.dates&&t.dates.start?S(t.dates.start,10):undefined,end:t.dates&&t.dates.end?S(t.dates.end,10):undefined};
   const fl=t.flights&&typeof t.flights==="object"?t.flights:{};
-  out.trip.flights={in:fl.in&&fl.in.code?{code:S(fl.in.code,20)}:(t.flightIn?{code:S(t.flightIn,20)}:null),out:fl.out&&fl.out.code?{code:S(fl.out.code,20)}:(t.flightOut?{code:S(t.flightOut,20)}:null)};
+  const FL=x=>x&&x.code?{code:S(x.code,20),...(x.sched?{sched:S(x.sched,5)}:{}),...(x.status?{status:S(x.status,40)}:{}),...(x.from?{from:S(x.from,12)}:{}),...(x.to?{to:S(x.to,12)}:{}),...(x.terminal?{terminal:S(x.terminal,6)}:{}),...(x.gate?{gate:S(x.gate,6)}:{}),...(x.hall?{hall:S(x.hall,4)}:{}),...(+x.at>0?{at:+x.at}:{})}:null;
+  out.trip.flights={in:FL(fl.in)||(t.flightIn?{code:S(t.flightIn,20)}:null),out:FL(fl.out)||(t.flightOut?{code:S(t.flightOut,20)}:null)};
   if(t.macau) out.trip.macau=S(t.macau,30);
   if(t.party&&typeof t.party==="object") out.trip.party={type:S(t.party.type,10)||"모녀"};
-  const L=Array.isArray(t.lodging)&&t.lodging[0]; if(L&&L.name&&isFinite(+L.lat)&&isFinite(+L.lng)) out.trip.lodging=[{name:S(L.name,60),area:S(L.area,20),q:S(L.q||L.name,120),lat:+L.lat,lng:+L.lng}];
+  const L=Array.isArray(t.lodging)&&t.lodging[0]; if(L&&L.name&&isFinite(+L.lat)&&isFinite(+L.lng)) out.trip.lodging=[{name:S(L.name,60),area:S(L.area,20),q:S(L.q||L.name,120),lat:+L.lat,lng:+L.lng,exact:L.exact?true:undefined}];
   out.days=p.days.slice(0,30).map(d=>{ d=d&&typeof d==="object"?d:{};
     const items=(Array.isArray(d.items)?d.items:[]).filter(it=>it&&typeof it==="object"&&isFinite(+it.lat)&&isFinite(+it.lng)&&Math.abs(+it.lat)<=90&&Math.abs(+it.lng)<=180).slice(0,50)
       .map(it=>({id:it.id?S(it.id,16):undefined,t:S(it.t,5),n:S(it.n,80),q:S(it.q||it.n,120),lat:+it.lat,lng:+it.lng,why:S(it.why,500),note:it.note?S(it.note,500):undefined,key:!!it.key,hotel:it.hotel?true:undefined,origin:["me","suzi","template"].includes(it.origin)?it.origin:"me",kind:KIND[it.kind]?it.kind:undefined,dur:(+it.dur>0&&+it.dur<=600)?Math.round(+it.dur):undefined,status:(it.status==="visited"||it.status==="skipped")?it.status:undefined,visitedAt:(+it.visitedAt>0)?+it.visitedAt:undefined,memo:it.memo?M(it.memo,300):undefined,alt:it.alt?S(it.alt,120):undefined,cost:(it.cost&&+it.cost.amount>0&&+it.cost.amount<=1e9&&CURS.includes(it.cost.cur))?{amount:+it.cost.amount,cur:it.cost.cur}:undefined}));
@@ -2174,14 +2181,48 @@ function openTrip(){
   f.querySelector('#tIn').value=(t.flights.in&&t.flights.in.code)||''; f.querySelector('#tOut').value=(t.flights.out&&t.flights.out.code)||'';
   f.querySelector('#tLodge').value=L.name||''; const sel=f.querySelector('#tArea'); sel.innerHTML=Object.keys(LODGE_AREAS).map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join(''); sel.value=LODGE_AREAS[L.area]?L.area:"셩완";
   f.querySelector('#tParty').value=(t.party&&t.party.type)||"모녀"; updateDaysNote();
+  flightInfo={in:null,out:null}; lodgeSel=(L.exact&&L.name)?{name:L.name,q:L.q,lat:L.lat,lng:L.lng}:null; document.getElementById('tLodgeList').hidden=true; const ln=document.getElementById('tLodgeNote'); ln.hidden=!lodgeSel; if(lodgeSel) ln.textContent=`${L.name} · ${L.area} · 지도의 ★ 숙소 핀이 실제 자리에 찍혀 있어요`; paintFlightHint(); loadWD();
   tripsheet.hidden=false; scrim.hidden=false; fab.hidden=true; setTimeout(()=>f.querySelector('#tTitle').focus(),50);
 }
-function closeTrip(){ tripsheet.hidden=true; scrim.hidden=true; fab.hidden=false; }
+function closeTrip(){ tripsheet.hidden=true; scrim.hidden=true; fab.hidden=false; document.getElementById('tLodgeList').hidden=true; }
+// 항공편: 편명을 항공사 이름으로 풀어 주고, 여행 날짜가 홍콩공항 공개 운항 정보 범위(과거 90일~14일 앞)면 Worker를 거쳐 도착·출발 시각을 불러온다
+const AIRLINES={ZE:"이스타항공","7C":"제주항공",KE:"대한항공",OZ:"아시아나항공",LJ:"진에어",TW:"티웨이항공",BX:"에어부산",RS:"에어서울",YP:"에어프레미아",CX:"캐세이퍼시픽",HX:"홍콩항공",UO:"홍콩익스프레스",NX:"에어마카오",SQ:"싱가포르항공",QF:"콴타스",TR:"스쿠트",JL:"일본항공",NH:"ANA",CI:"중화항공",BR:"에바항공",TG:"타이항공",VN:"베트남항공",EK:"에미레이트",QR:"카타르항공",BA:"영국항공",UA:"유나이티드",AA:"아메리칸항공",DL:"델타",AC:"에어캐나다",MU:"중국동방항공",CA:"중국국제항공",CZ:"중국남방항공",MH:"말레이시아항공",GA:"가루다",PR:"필리핀항공","5J":"세부퍼시픽",AK:"에어아시아",D7:"에어아시아X"};
+function parseFlightNo(v){ const m=/^\s*([A-Za-z0-9]{2})\s*0*(\d{1,4})([A-Za-z]?)/.exec(String(v||'')); if(!m||!/[A-Za-z]/.test(m[1])) return null; const code=m[1].toUpperCase(); return {code,no:code+m[2]+(m[3]||'').toUpperCase(),airline:AIRLINES[code]||''}; }
+function flightWindow(dateStr){ const d=parseYMD(dateStr); if(!d) return false; const today=new Date(); today.setHours(12,0,0,0); const diff=Math.round((d-today)/864e5); return diff>=-90&&diff<=14; }
+let flightInfo={in:null,out:null};
+function flightLine(which,no,info,date){ if(!info) return `${which} ${no}: ${date}에 홍콩 ${which==='가는 편'?'도착':'출발'} 편이 없어요`; return which==='가는 편'?`가는 편 ${no}: ${info.from?info.from+' → ':''}홍콩 ${info.sched} 도착${info.status?' · '+info.status:''}${info.hall?' · 입국홀 '+info.hall:''}${info.baggage?' · 수하물 '+info.baggage:''}`:`오는 편 ${no}: 홍콩 ${info.sched} 출발${info.to?' → '+info.to:''}${info.status?' · '+info.status:''}${info.terminal?' · '+info.terminal:''}${info.gate?' 게이트 '+info.gate:''}`; }
+function paintFlightHint(){ const f=document.getElementById('tripform'); const a=parseFlightNo(f.querySelector('#tIn').value), b=parseFlightNo(f.querySelector('#tOut').value);
+  const parts=[]; if(a) parts.push(`가는 편 ${a.no}${a.airline?' · '+a.airline:''}`); if(b) parts.push(`오는 편 ${b.no}${b.airline?' · '+b.airline:''}`); document.getElementById('tFlightHint').textContent=parts.join(' / ');
+  const s=f.querySelector('#tStart').value, e=f.querySelector('#tEnd').value; const can=!!((a&&flightWindow(s))||(b&&flightWindow(e))); document.getElementById('tFlightFetch').disabled=!can;
+  const note=document.getElementById('tFlightNote'); const t=plan.trip.flights||{}; const saved=[t.in&&t.in.sched&&a&&t.in.code===a.no?flightLine('가는 편',a.no,t.in,s):'',t.out&&t.out.sched&&b&&t.out.code===b.no?flightLine('오는 편',b.no,t.out,e):''].filter(Boolean);
+  note.textContent=saved.length?saved.join(' / ')+' (저장됨)':((a||b)?(can?'홍콩공항 공개 운항 정보를 가져와요 (과거 90일~14일 앞)':'출발 14일 전부터 홍콩공항 운항 정보를 불러올 수 있어요'):''); }
+async function fetchFlights(){ const f=document.getElementById('tripform'); const a=parseFlightNo(f.querySelector('#tIn').value), b=parseFlightNo(f.querySelector('#tOut').value); const s=f.querySelector('#tStart').value, e=f.querySelector('#tEnd').value; const api=shareApi(); const note=document.getElementById('tFlightNote'); const btn=document.getElementById('tFlightFetch'); btn.disabled=true; note.textContent='홍콩공항에서 불러오는 중…'; const out=[];
+  const q=async(no,date,dir)=>{ try{ const r=await fetch(`${api}/flights?date=${date}&no=${encodeURIComponent(no)}`); if(!r.ok) return null; const j=await r.json(); const hit=(j.found||[]).find(x=>x.dir===dir); return hit?{sched:hit.time,status:hit.status,from:(hit.origin||[]).join('/'),to:(hit.destination||[]).join('/'),terminal:hit.terminal,gate:hit.gate,hall:hit.hall,baggage:hit.baggage,at:Date.now()}:null; }catch(e){ return null; } };
+  try{ if(a&&flightWindow(s)){ flightInfo.in=await q(a.no,s,'arr'); out.push(flightLine('가는 편',a.no,flightInfo.in,s)); }
+    if(b&&flightWindow(e)){ flightInfo.out=await q(b.no,e,'dep'); out.push(flightLine('오는 편',b.no,flightInfo.out,e)); } }
+  finally{ btn.disabled=false; }
+  note.textContent=(out.join(' / ')||'편명과 날짜를 먼저 적어 주세요')+((flightInfo.in||flightInfo.out)?' · 저장을 누르면 기억해요':''); }
+['tIn','tOut','tStart','tEnd'].forEach(id=>document.getElementById(id).addEventListener('input',paintFlightHint));
+document.getElementById('tFlightFetch').onclick=fetchFlights;
+// 숙소: 장소 사전의 호텔(수백 곳)에서 바로 고르거나 지도에서 찾는다. 고르면 이름·지역·실제 좌표가 채워진다
+let lodgeSel=null;
+function nearestArea(lat,lng){ if(lng<113.75) return '마카오'; let best='셩완', bd=1e9; for(const [k,c] of Object.entries(LODGE_AREAS)){ if(k==='마카오') continue; const d=Math.hypot(lat-c[0],lng-c[1]); if(d<bd){ bd=d; best=k; } } return best; }
+function paintLodgeList(){ const inp=document.getElementById('tLodge'), L=document.getElementById('tLodgeList'); const q=inp.value.trim(); if(lodgeSel&&lodgeSel.name!==q) lodgeSel=null; if(q.length<2){ L.hidden=true; L.innerHTML=''; return; }
+  if(!WD){ loadWD().then(()=>{ if(!tripsheet.hidden) paintLodgeList(); }); L.innerHTML='<p class="hint">장소 사전을 내려받는 중…</p>'; L.hidden=false; return; }
+  const nq=nrm(q); const hits=WD.filter(p=>p.kind==='호텔'&&(p.k.includes(nq)||p.e.includes(nq)||(p.z&&p.z.includes(nq)))).sort((a,b)=>b.pop-a.pop||a.name.localeCompare(b.name)).slice(0,6);
+  L.innerHTML=(lodgeSel&&lodgeSel.name===q?'':hits.map(p=>`<button class="pl" type="button" data-i="${p.i}"><b>${esc(p.name)}</b><span class="ar">${esc(nearestArea(p.lat,p.lng))}${p.ai?' · 표기 추정':''}</span><span class="w">${esc([p.ko&&p.en?p.en:'',p.zh].filter(Boolean).join(' · '))}</span></button>`).join('')+`<button class="pl" type="button" data-geo="1"><b>지도에서 "${esc(q)}" 찾기</b><span class="w">목록에 없으면 지도(OpenStreetMap)에서 찾아요</span></button>`); L.hidden=!L.innerHTML; }
+function chooseLodge(sel){ lodgeSel=sel; document.getElementById('tLodge').value=sel.name; document.getElementById('tArea').value=nearestArea(sel.lat,sel.lng); document.getElementById('tLodgeList').hidden=true; const n=document.getElementById('tLodgeNote'); n.textContent=`${sel.name} · ${nearestArea(sel.lat,sel.lng)} · 지도의 ★ 숙소 핀이 이 자리에 찍혀요`; n.hidden=false; }
+document.getElementById('tLodge').addEventListener('input',()=>{ document.getElementById('tLodgeNote').hidden=true; paintLodgeList(); });
+document.getElementById('tLodgeList').addEventListener('click',async e=>{ const g=e.target.closest('[data-geo]'); const L=document.getElementById('tLodgeList');
+  if(g){ const q=document.getElementById('tLodge').value.trim(); L.innerHTML='<p class="hint">지도에서 찾는 중…</p>'; let list=[]; try{ list=geoFilter(await geoSearch(q)).map(geoPlace); }catch(err){} if(!list.length){ L.innerHTML='<p class="hint">지도에서 못 찾았어요. 영어 이름으로 다시 쳐 보세요</p>'; return; } L.innerHTML=list.slice(0,6).map((p,i)=>`<button class="pl" type="button" data-g="${i}"><b>${esc(p.n)}</b><span class="ar">${esc(nearestArea(p.lat,p.lng))} · ${esc(p.kind)}</span><span class="w">${esc(p.addr||'')}</span></button>`).join(''); L._geo=list; return; }
+  const b=e.target.closest('.pl'); if(!b) return;
+  if(b.dataset.g!==undefined){ const p=(L._geo||[])[+b.dataset.g]; if(p) chooseLodge({name:p.n.slice(0,60),q:p.q,lat:p.lat,lng:p.lng}); return; }
+  const p=WD&&WD[+b.dataset.i]; if(!p) return; const nm=(p.en||p.zh||p.ko).replace(/\s*,\s*$/,''); chooseLodge({name:p.name.slice(0,60),q:(/hong\s*kong|macau|macao|香港|澳門/i.test(nm)?nm:nm+(p.lng<113.75?' Macau':' Hong Kong')).slice(0,100),lat:p.lat,lng:p.lng}); });
 function updateDaysNote(){ const f=document.getElementById('tripform'), a=parseYMD(f.querySelector('#tStart').value), b=parseYMD(f.querySelector('#tEnd').value), el=f.querySelector('#tDaysNote'); if(a&&b&&b>=a){ const n=dayCountBetween(a,b); el.textContent=`${n-1}박 ${n}일 · 지금 Day ${plan.days.length}개${n!==plan.days.length?` → Day ${n}개로 맞춰요`:''}`; el.hidden=false; } else if(a&&b){ el.textContent='종료일이 시작일보다 빨라요'; el.hidden=false; } else el.hidden=true; }
 document.getElementById('tStart').addEventListener('change',updateDaysNote); document.getElementById('tEnd').addEventListener('change',updateDaysNote);
 document.getElementById('tripClose').onclick=closeTrip; document.getElementById('tripCancel').onclick=closeTrip;
 document.getElementById('tripform').onsubmit=e=>{ e.preventDefault(); const f=e.target; const a=parseYMD(f.querySelector('#tStart').value), b=parseYMD(f.querySelector('#tEnd').value); if(a&&b&&b<a){ updateDaysNote(); return; }
-  snapshot(); const note=setTripFields({title:f.querySelector('#tTitle').value,start:f.querySelector('#tStart').value,end:f.querySelector('#tEnd').value,flight_in:f.querySelector('#tIn').value.trim(),flight_out:f.querySelector('#tOut').value.trim(),lodging_name:f.querySelector('#tLodge').value,lodging_area:f.querySelector('#tArea').value,party:f.querySelector('#tParty').value});
+  snapshot(); const note=setTripFields({title:f.querySelector('#tTitle').value,start:f.querySelector('#tStart').value,end:f.querySelector('#tEnd').value,flight_in:f.querySelector('#tIn').value.trim(),flight_out:f.querySelector('#tOut').value.trim(),flight_in_info:flightInfo.in||undefined,flight_out_info:flightInfo.out||undefined,lodging_name:f.querySelector('#tLodge').value,lodging_area:f.querySelector('#tArea').value,lodging_lat:lodgeSel?lodgeSel.lat:undefined,lodging_lng:lodgeSel?lodgeSel.lng:undefined,lodging_q:lodgeSel?lodgeSel.q:undefined,party:f.querySelector('#tParty').value});
   save(); render(); closeTrip(); statusHint(note?`여행 정보를 저장했어요 · ${note}`:'여행 정보를 저장했어요'); };
 document.getElementById('status').addEventListener('click',()=>{ if(currentMeta().custom) openTrip(); else if(currentMeta().shared) statusHint('받은 여정이에요. "내 여정으로 가져오기"를 누르면 날짜·숙소를 고칠 수 있어요'); else statusHint('추천 여정이에요. 아래 "이 여정을 바탕으로 직접 꾸미기"를 누르면 날짜·숙소를 적을 수 있어요'); });
 document.getElementById('status').addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&currentMeta().custom){ e.preventDefault(); openTrip(); } });

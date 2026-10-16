@@ -48,6 +48,7 @@ API 키를 HTML에 넣으면 받는 사람 모두에게 키가 노출되므로, 
 | `PUT /p/<code>/<id>` (image/jpeg·png·webp, 3MB 이하, 코드당 60개) | 공유 사진 올리기 | R2 `PHOTOS` |
 | `GET /p/<code>/<id>` | 사진 내려받기(1년 캐시) | R2, 수명주기 90일 |
 | `GET /` | 기능 안내 `{share, photos, ttlDays}` | - |
+| `GET /flights?date=YYYY-MM-DD&no=ZE861` | 홍콩공항 공개 운항 정보 중계(도착·출발, 과거 90일~14일 앞), 5분 캐시 | - |
 
 쓰기(POST/PUT)는 `ALLOWED_ORIGIN`에서만, 읽기(GET)는 누구나(링크를 받은 사람). IP당 제한: 일반 30회/분, 사진 올리기 120회/분.
 
