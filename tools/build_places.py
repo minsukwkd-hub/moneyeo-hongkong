@@ -162,6 +162,55 @@ def ai_korean_names(cands):
         list(ex.map(run_chunk, chunks))
     return cache
 
+def review_korean_names(cands):
+    """[(key, en, zh, ko_now)] → 더 좋은 모델(Sonnet)로 상위 인기 장소의 AI 표기를 재검토해 ko_ai.json을 덮어쓴다."""
+    fp = os.path.join(RAW, "ko_ai.json"); cache = json.load(io.open(fp, encoding="utf-8")) if os.path.exists(fp) else {}
+    rfp = os.path.join(RAW, "ko_reviewed.json"); reviewed = json.load(io.open(rfp, encoding="utf-8")) if os.path.exists(rfp) else {}
+    todo = [c for c in cands if c[0] not in reviewed]
+    print("review korean names: reviewed", len(reviewed), "todo", len(todo))
+    SYS = ("너는 홍콩·마카오 여행 가이드북 편집자야. 입력 [{\"i\",\"en\",\"zh\",\"ko\"}]의 ko는 기계가 만든 한국어 표기야. 한국 여행자들이 실제로 쓰는 통용 표기(가이드북·블로그·지도앱 기준)로 고쳐 [{\"i\",\"ko\"}] JSON 배열만 출력해. "
+           "이미 맞으면 그대로. 규칙: 유명 명소·역·호텔·체인은 관용 표기(Tsim Sha Tsui→침사추이, Central→센트럴, Sham Shui Po→삼수이포, Wan Chai→완차이, Tai Kwun→타이쿤, PMQ→PMQ, M+→M+, Lan Fong Yuen→란퐁유엔, Tsui Wah→추이와, Kam Wah→캄와). "
+           "영어 일반 명사는 번역(Park→공원, Pier→부두, Temple→사원, Market→시장), 고유명사는 광둥어 발음 기준 한글 표기. 30자 이내, 설명 없이 JSON만.")
+    url = "https://suzi-proxy.suzi-proxy.workers.dev/"
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    lock = threading.Lock(); done = [0]
+    def run_chunk(chunk):
+        msg = json.dumps([{"i": k, "en": c[1], "zh": c[2], "ko": c[3]} for k, c in enumerate(chunk)], ensure_ascii=False)
+        body = {"model": "claude-sonnet-5-5", "max_tokens": 4000, "stream": False, "system": SYS, "messages": [{"role": "user", "content": msg}], "output_config": {"effort": "low"}}
+        txt = None
+        for attempt in range(5):
+            try:
+                txt = http(url, json.dumps(body).encode("utf-8"), {"Content-Type": "application/json", "Origin": "http://localhost:8765", "anthropic-version": "2023-06-01"}, timeout=180); break
+            except Exception as e:
+                print("  review retry", attempt, str(e)[:100], flush=True); time.sleep(10 * (attempt + 1))
+        arr = []
+        if txt:
+            try:
+                r = json.loads(txt); text = "".join(b.get("text", "") for b in r.get("content", []) if b.get("type") == "text")
+                m = re.search(r"\[[\s\S]*\]", text); arr = json.loads(m.group(0)) if m else []
+            except Exception as e:
+                print("  parse fail", str(e)[:80], flush=True)
+        changed = 0
+        with lock:
+            for o in arr:
+                try:
+                    k = int(o.get("i")); ko = str(o.get("ko", "")).strip()[:30]
+                    if 0 <= k < len(chunk) and ko and HANGUL.search(ko) or (ko and ko.upper() == ko and len(ko) <= 6):
+                        if ko != chunk[k][3]: changed += 1
+                        cache[chunk[k][0]] = ko; reviewed[chunk[k][0]] = ko
+                except Exception: pass
+            if txt:
+                for c in chunk: reviewed.setdefault(c[0], c[3])
+            io.open(fp, "w", encoding="utf-8").write(json.dumps(cache, ensure_ascii=False))
+            io.open(rfp, "w", encoding="utf-8").write(json.dumps(reviewed, ensure_ascii=False))
+            done[0] += len(chunk); print("  ", done[0], "/", len(todo), "changed", changed, flush=True)
+        time.sleep(1.0)
+    chunks = [todo[i:i + 40] for i in range(0, len(todo), 40)]
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        list(ex.map(run_chunk, chunks))
+    return cache
+
 def pick_names(t, wd):
     ko = t.get("name:ko") or (wd.get("ko") if wd else "") or ""
     en = t.get("name:en") or (wd.get("en") if wd else "") or ""
@@ -233,6 +282,12 @@ def build():
         for c in cands:
             if c[0] not in seen_keys: seen_keys[c[0]] = 1; uniq.append(c)
         ai = ai_korean_names(uniq)
+        if "--review" in sys.argv:  # 인기 상위(pop>=2)의 AI 표기를 Sonnet으로 재검토
+            rc = []; seenr = set()
+            for x in out:
+                k = (x[1] or "") + "|" + (x[2] or "")
+                if not x[0] and x[6] >= 2 and ai.get(k) and k not in seenr: seenr.add(k); rc.append((k, x[1], x[2], ai[k]))
+            ai = review_korean_names(rc)
         n = 0
         for x in out:
             if not x[0]:

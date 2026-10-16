@@ -1863,7 +1863,7 @@ function validateDoc(p){
   const L=Array.isArray(t.lodging)&&t.lodging[0]; if(L&&L.name&&isFinite(+L.lat)&&isFinite(+L.lng)) out.trip.lodging=[{name:S(L.name,60),area:S(L.area,20),q:S(L.q||L.name,120),lat:+L.lat,lng:+L.lng}];
   out.days=p.days.slice(0,30).map(d=>{ d=d&&typeof d==="object"?d:{};
     const items=(Array.isArray(d.items)?d.items:[]).filter(it=>it&&typeof it==="object"&&isFinite(+it.lat)&&isFinite(+it.lng)&&Math.abs(+it.lat)<=90&&Math.abs(+it.lng)<=180).slice(0,50)
-      .map(it=>({id:it.id?S(it.id,16):undefined,t:S(it.t,5),n:S(it.n,80),q:S(it.q||it.n,120),lat:+it.lat,lng:+it.lng,why:S(it.why,500),note:it.note?S(it.note,500):undefined,key:!!it.key,hotel:it.hotel?true:undefined,origin:["me","suzi","template"].includes(it.origin)?it.origin:"me",kind:KIND[it.kind]?it.kind:undefined,dur:(+it.dur>0&&+it.dur<=600)?Math.round(+it.dur):undefined,status:(it.status==="visited"||it.status==="skipped")?it.status:undefined,visitedAt:(+it.visitedAt>0)?+it.visitedAt:undefined,memo:it.memo?M(it.memo,300):undefined,cost:(it.cost&&+it.cost.amount>0&&+it.cost.amount<=1e9&&CURS.includes(it.cost.cur))?{amount:+it.cost.amount,cur:it.cost.cur}:undefined}));
+      .map(it=>({id:it.id?S(it.id,16):undefined,t:S(it.t,5),n:S(it.n,80),q:S(it.q||it.n,120),lat:+it.lat,lng:+it.lng,why:S(it.why,500),note:it.note?S(it.note,500):undefined,key:!!it.key,hotel:it.hotel?true:undefined,origin:["me","suzi","template"].includes(it.origin)?it.origin:"me",kind:KIND[it.kind]?it.kind:undefined,dur:(+it.dur>0&&+it.dur<=600)?Math.round(+it.dur):undefined,status:(it.status==="visited"||it.status==="skipped")?it.status:undefined,visitedAt:(+it.visitedAt>0)?+it.visitedAt:undefined,memo:it.memo?M(it.memo,300):undefined,alt:it.alt?S(it.alt,120):undefined,cost:(it.cost&&+it.cost.amount>0&&+it.cost.amount<=1e9&&CURS.includes(it.cost.cur))?{amount:+it.cost.amount,cur:it.cost.cur}:undefined}));
     const bridges=(Array.isArray(d.bridges)?d.bridges:[]).slice(0,30).map(b=>({after:b&&b.after?S(b.after,16):null,text:S(b&&b.text,120),done:!!(b&&b.done)}));
     const expenses=(Array.isArray(d.expenses)?d.expenses:[]).filter(x=>x&&typeof x==="object"&&+x.amount>0&&+x.amount<=1e9&&CURS.includes(x.cur)).slice(0,100).map(x=>({amount:+x.amount,cur:x.cur,memo:x.memo?S(x.memo,80):undefined}));
     const journal=(d.journal&&typeof d.journal==="object"&&d.journal.text)?{text:M(d.journal.text,2000),mood:d.journal.mood?S(d.journal.mood,4):undefined,updatedAt:(+d.journal.updatedAt>0)?+d.journal.updatedAt:Date.now()}:undefined;
@@ -2167,7 +2167,7 @@ function closeAdd(){ addsheet.hidden=true; scrim.hidden=true; fab.hidden=false; 
 // 장소 넣기 시트를 열 때 한 번 내려받아 기기 안에서 찾는다(키·서버 없음). 생성기: tools/build_places.py
 let WD=null, wdLoading=null;
 function loadWD(){ if(WD) return Promise.resolve(WD); if(!wdLoading){ wdLoading=fetch('data/places-hk.json').then(r=>{ if(!r.ok) throw new Error('http '+r.status); return r.json(); }).then(j=>{
-    WD=(j.items||[]).map((a,i)=>({i,ko:a[0]||'',en:a[1]||'',zh:a[2]||'',lat:+a[3],lng:+a[4],kind:KIND[a[5]]?a[5]:(a[5]==='동네'?'동네':'명소'),pop:+a[6]||0,cui:a[7]||''}));
+    WD=(j.items||[]).map((a,i)=>({i,ko:a[0]||'',en:a[1]||'',zh:a[2]||'',lat:+a[3],lng:+a[4],kind:KIND[a[5]]?a[5]:(a[5]==='동네'?'동네':'명소'),pop:+a[6]||0,cui:a[7]||'',ai:a[8]==='ai'}));
     WD.forEach(p=>{ p.k=nrm(p.ko); p.e=nrm(p.en); p.z=nrm(p.zh); p.c=nrm(p.cui); p.name=p.ko||p.en||p.zh; });
     return WD; }).catch(e=>{ wdLoading=null; return null; }); } return wdLoading; }
 function nrm(x){ return String(x||'').toLowerCase().replace(/[\s·\-–—'’.,()（）]/g,''); }
@@ -2199,7 +2199,7 @@ function renderCatalog(){
   document.getElementById('areas').innerHTML=["전체",...AREAS].map(a=>`<button class="chip${a===addArea?' on':''}" type="button" data-a="${esc(a)}">${esc(a)}</button>`).join('');
   const have=new Set(list.map(p=>nrm(p.n))); const wd=wdMatches(qv).filter(p=>!have.has(nrm(p.name))&&(addArea==="전체"||areaOf(p)===addArea));
   document.getElementById('catalog').innerHTML=(list.length?list.map(p=>`<button class="pl${addSel===p?' on':''}" type="button" data-q="${esc(p.q)}" aria-pressed="${addSel===p}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)}</span><span class="w">${esc(p.why)}</span></button>`).join(''):(wd.length?'':'<p class="hint">목록에는 없어요. 위 "지도에서 찾기"를 누르거나(영어·한자 이름이 잘 찾혀요) 토끼에게 "○○ 넣어줘"라고 해 보세요.</p>'))
-    +(wd.length?`<p class="hint grp">장소 사전에서 찾은 곳 · 누르면 선택돼요</p>`+wd.map(p=>`<button class="pl wd" type="button" data-wd="${p.i}"><b>${esc(p.name)}</b><span class="ar">${esc(areaOf(p))} · ${esc(p.kind)}${p.cui?' · '+esc(p.cui):''}</span><span class="w">${esc([p.ko&&p.en?p.en:'',p.zh].filter(Boolean).join(' · '))}</span></button>`).join(''):(qv&&!WD&&wdLoading?'<p class="hint">장소 사전을 내려받는 중…</p>':''));
+    +(wd.length?`<p class="hint grp">장소 사전에서 찾은 곳 · 누르면 선택돼요</p>`+wd.map(p=>`<button class="pl wd" type="button" data-wd="${p.i}"><b>${esc(p.name)}</b><span class="ar">${esc(areaOf(p))} · ${esc(p.kind)}${p.cui?' · '+esc(p.cui):''}${p.ai?' · 표기 추정':''}</span><span class="w">${esc([p.ko&&p.en?p.en:'',p.zh].filter(Boolean).join(' · '))}</span></button>`).join(''):(qv&&!WD&&wdLoading?'<p class="hint">장소 사전을 내려받는 중…</p>':''));
 }
 function updateAddForm(){ document.getElementById('selName').textContent=addSel?'선택: '+addSel.n:'아래에서 장소를 고르세요'; document.getElementById('addGo').disabled=!addSel; }
 document.getElementById('addClose').onclick=closeAdd;
@@ -2207,7 +2207,7 @@ document.getElementById('search').addEventListener('input',()=>{ renderCatalog()
 document.getElementById('areas').onclick=e=>{ const b=e.target.closest('.chip'); if(b){ addArea=b.dataset.a; renderCatalog(); } };
 function pickPlace(place){ const k=CUSTOM_PLACES.findIndex(x=>x.q===place.q); if(k>=0) CUSTOM_PLACES[k]=place; else CUSTOM_PLACES.unshift(place); saveCustomPlaces(); addSel=CUSTOM_PLACES.find(x=>x.q===place.q); renderCatalog(); updateAddForm(); }
 document.getElementById('catalog').onclick=e=>{
-  const w=e.target.closest('.pl[data-wd]'); if(w){ const p=WD&&WD[+w.dataset.wd]; if(!p) return; const nm=(p.en||p.zh||p.ko).replace(/\s*,\s*$/,''); pickPlace({n:p.name.slice(0,60),q:(/hong\s*kong|macau|macao|香港|澳門/i.test(nm)?nm:nm+(p.lng<113.75?' Macau':' Hong Kong')).slice(0,100),lat:p.lat,lng:p.lng,why:'',note:p.cui?('음식: '+p.cui):'',area:areaOf(p),kind:KIND[p.kind]?p.kind:'명소',custom:true,src:'wd'}); document.getElementById('selName').textContent='선택: '+p.name+' · 장소 사전'; return; }
+  const w=e.target.closest('.pl[data-wd]'); if(w){ const p=WD&&WD[+w.dataset.wd]; if(!p) return; const nm=(p.en||p.zh||p.ko).replace(/\s*,\s*$/,''); pickPlace({n:p.name.slice(0,60),q:(/hong\s*kong|macau|macao|香港|澳門/i.test(nm)?nm:nm+(p.lng<113.75?' Macau':' Hong Kong')).slice(0,100),lat:p.lat,lng:p.lng,why:'',note:p.cui?('음식: '+p.cui):'',area:areaOf(p),kind:KIND[p.kind]?p.kind:'명소',custom:true,src:'wd',alt:[p.en,p.zh].filter(x=>x&&x!==p.name).join(' · ')}); document.getElementById('selName').textContent='선택: '+p.name+' · 장소 사전'; return; }
   const b=e.target.closest('.pl'); if(!b) return; addSel=allPlaces().find(p=>p.q===b.dataset.q)||null; renderCatalog(); updateAddForm(); };
 // 지도에서 찾기: OpenStreetMap Nominatim(키·서버 없음, 1초 1회 정책). 카탈로그에 없는 장소를 이름으로 찾아 좌표·종류까지 가져와 내 장소 목록(tokki-places-v1)에 넣는다.
 // 한국어 이름은 OSM에 name:ko가 있는 곳만 잡히므로 영어·한자 이름을 권한다. 홍콩·마카오 범위로 한정.
@@ -2289,7 +2289,7 @@ document.getElementById('addGo').onclick=()=>{
   const di=dayIdx(document.getElementById('addDay').value), d=plan.days[di];
   const tm=document.getElementById('addTime').value||"10:00";
   snapshot();
-  d.items.push({id:newId(),t:tm,n:addSel.n,q:addSel.q,lat:addSel.lat,lng:addSel.lng,why:addSel.why,note:addSel.note,key:document.getElementById('addKey').checked,origin:"me",...(addSel.kind?{kind:addSel.kind}:{})});
+  d.items.push({id:newId(),t:tm,n:addSel.n,q:addSel.q,lat:addSel.lat,lng:addSel.lng,why:addSel.why,note:addSel.note,key:document.getElementById('addKey').checked,origin:"me",...(addSel.kind?{kind:addSel.kind}:{}),...(addSel.alt?{alt:String(addSel.alt).slice(0,120)}:{})});
   sortDay(d); save(); render(); closeAdd();
   const sec=document.getElementById('d'+(di+1)); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'});
 };
@@ -2317,11 +2317,12 @@ function openInfo(it){
   const inf=infoOf(it.q), kind=kindOf(it), hotel=kind==="호텔";
   document.getElementById('infoKind').textContent=kind;
   const L0=lodgingOf(); document.getElementById('infoTitle').textContent=hotel?(L0.isDefault?"숙소 (셩완)":L0.name+" · "+L0.area):it.n;
-  document.getElementById('infoSub').textContent=[areaOf(it), it.t?('일정 '+it.t):''].filter(Boolean).join(' · ');
+  document.getElementById('infoSub').textContent=[areaOf(it), it.t?('일정 '+it.t):'', it.alt||((it.origin==='me'&&it.q&&it.q!==it.n)?String(it.q).replace(/\s(Hong Kong|Macau)$/,''):'')].filter(Boolean).join(' · ');
   const hoursLabel = kind==="페리"?"운항":(kind==="교통"?"운행":(hotel?"시간":"영업시간"));
   const rows=[[hoursLabel,inf.hours],["요금",inf.fee],["팁",inf.tip]].filter(r=>r[1]);
   let html='';
-  html+=`<div><h3>${hotel?"이런 곳이에요":"왜 여기냐면"}</h3><p>${esc(hotel?(inf.tip||it.why||''):(it.why||''))}</p>${(!hotel&&it.note)?`<p class="note">${esc(it.note)}</p>`:''}</div>`;
+  const whyTxt=hotel?(inf.tip||it.why||''):(it.why||(it.origin==='me'?'직접 넣은 곳이에요. 장소 사전이나 지도에서 가져온 이름과 위치만 있고, 설명은 토끼에게 물어보면 채워 줘요.':''));
+  html+=`<div><h3>${hotel?"이런 곳이에요":"왜 여기냐면"}</h3><p>${esc(whyTxt)}</p>${(!hotel&&it.note)?`<p class="note">${esc(it.note)}</p>`:''}</div>`;
   const rows2=hotel?rows.filter(r=>r[0]!=="팁"):rows;
   if(rows2.length) html+=`<div><h3>${kind==="페리"?"페리 운항 정보":(kind==="교통"?"운행 정보":(hotel?"숙소 정보":"운영 정보"))}</h3><dl class="kv">${rows2.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
   else if(!hotel) html+=`<div><h3>운영 정보</h3><p class="note">영업시간과 요금은 아래 구글 지도 링크에서 확인하세요.</p></div>`;
