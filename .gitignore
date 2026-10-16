@@ -11,3 +11,7 @@ node_modules/
 모녀 홍콩 3박4일.md
 .vercel/
 .playwright-mcp/
+
+# 장소 사전 생성 캐시(OSM·Wikidata 원본, 수 MB) — 재생성 가능
+tools/places_raw/
+tools/__pycache__/
