@@ -30,7 +30,7 @@
 - 커밋 메시지 끝에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 - 로컬 확인: `python -m http.server 8765 --directory .` 후 http://localhost:8765/index.html (file:// 로 열면 fetch·일부 기능 제한).
 
-## 진행 상태 (2026-10-16)
+## 진행 상태 (2026-10-16 마감 · 작업기록 45번까지)
 - SUZI 프록시: **Cloudflare Worker 운영 중, 종단 검증 완료** https://suzi-proxy.suzi-proxy.workers.dev/ (계정 이메일 minsukwkd+cf@gmail.com). 시크릿은 `ANTHROPIC_API_KEY` 하나. **서버 토큰은 쓰지 않기로 결정**(Origin 제한·IP당 30회/분·월 한도로 방어). **실행 위치는 도쿄 고정(`[placement] region`)** — Anthropic이 홍콩(HKG) 발신을 403으로 막기 때문. 이 설정을 지우면 홍콩 현지에서 SUZI가 죽는다. Vercel 배포본(https://suzi-proxy.vercel.app/api/suzi, hnd1 고정)은 예비.
 - `SUZI_DEFAULT.url`은 Cloudflare 주소, `token`은 빈 값이 정상. 저장된 연결 설정은 사용자가 직접 바꾼 경우(`custom:true`)가 아니면 항상 `SUZI_DEFAULT`를 따른다.
 - 설계: `docs/설계.md`(v3, 개정 2)가 장기 구조·데이터 모델·착수 순서(M0~M4)의 기준. **M0·M1·M2 완료**(이름/토끼 호칭/인앱 띠 · 모델 v3+repo+SUZI id 도구 · 내보내기/불러오기 · 여행 정보 시트 · ▲▼ 순서/이동시간/부하 경고 · 직접 장소/챙김 메모). **M3 완료**(사진·공유 링크·기록·여행 목록 홈). **M4 완료**: 짧은 공유 코드 `#c=<code>`(Worker KV, 90일) + 사진 포함 공유(R2, 코드당 최대 30장, 90일). 서버 실패 시 `#s=` 긴 링크로 복귀. 공유 시트는 사용자 탭 안에서만 열려 "링크 만들기 → 보내기" 두 단계.
