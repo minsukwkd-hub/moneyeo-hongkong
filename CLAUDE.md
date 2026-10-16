@@ -13,7 +13,7 @@
 - 일정 데이터: `PLAN_A`(현재 여정) `PLAN_B`(조금 다른) `PLAN_C`(다른) `PLAN_U`(당신의 여정 = 직접 꾸미기 뼈대) → `PLANS` 배열. 저장: localStorage `suzi-hk-plan-v2:<id>`, 선택 여정 `suzi-hk-variant`.
 - 장소 사전: `CATALOG`(세 여정 + `EXTRA`에서 q 기준 중복 제거, `areaOf`로 지역 분류). 운영 정보: `INFO` (키 = 구글지도 검색어 q; `hours, fee, tip, site, siteName, src, upd, conf`). 기준일 `INFO_ASOF`. 사용자/SUZI 수정 오버레이 `INFO_EDIT` → `suzi-hk-info-v1`.
 - 렌더: `render()` 하나가 상단 상태·여정 선택 버튼·탭·Day 섹션·전체 지도를 모두 다시 그린다. 지도는 Leaflet + 내장 해안선 `LANDGEO`(타일 없음) — 좌표는 홍콩·마카오 범위만 의미 있음.
-- 시트: SUZI(`#sheet`), 장소 넣기(`#addsheet`, 직접 꾸미기에서만, 직접 입력 폼 포함), 장소 정보(`#infosheet`, 제목 클릭), 여행 정보(`#tripsheet`, 상태 타일 클릭), 챙김 메모(`#bridgesheet`).
+- 시트: SUZI(`#sheet`), 장소 넣기(`#addsheet`, 직접 꾸미기에서만, 직접 입력 폼 + "지도에서 찾기"=OpenStreetMap Nominatim 직접 호출·홍콩/마카오 범위·버튼식), 장소 정보(`#infosheet`, 제목 클릭), 여행 정보(`#tripsheet`, 상태 타일 클릭), 챙김 메모(`#bridgesheet`).
 - SUZI 연결 어댑터(`connect()`): ① claude.ai 아티팩트 `window.claude` sample → ② 외부 서버(`CONN.url`, Bearer 토큰) → ③ API 키 직접(테스트용). 설정은 ⚙, localStorage `suzi-hk-conn-v1`. 공유용 기본값은 `SUZI_DEFAULT` 상수.
 - SUZI 직접 호출(`apiChat`): Messages API 스트리밍(SSE) + 수동 tool loop. 모델 기본 `claude-opus-5-5`, `output_config.effort:"high"`, `fallbacks:"default"`(beta 헤더 `server-side-fallback-2026-07-01`). thinking 블록은 서명 포함 그대로 되돌려 보낸다.
 - SUZI 도구: add_stop / remove_stop / update_stop(stop_id 우선, dur) / reorder_stops / add_bridge / remove_bridge / mark_visited / add_expense / set_journal / swap_days / choose_plan / update_info / set_trip_info(날짜·숙소·동행).
@@ -34,6 +34,7 @@
 - 기록(M3b): `Stop.status|memo|cost{amount,cur}`, `Day.expenses[]`, `Day.journal{text,mood}`. 통화 HKD·MOP·KRW, 합계는 통화별(`spendOf`). 시트 `#recsheet`(장소 기록)·`#exsheet`(Day 지출)·`#journalsheet`(일기). 받은 여정(S)에서는 기록 불가. 공유 링크엔 안 실리고 내보내기엔 실린다. SUZI 도구 mark_visited / add_expense / set_journal.
 - 공유 링크(M3a): `toSlim`/`fromSlim`(슬림 포맷 v1) → deflate-raw → base64url → `#s=`(압축 불가 브라우저는 `#j=`). 받는 쪽은 부팅 때 해시를 풀어 "받은 여정"(variant `S`, `SHARED.meta`, 저장 안 함)으로 보여 주고 "내 여정으로 가져오기"로 `applyImport`. 1,800자 초과면 파일 내보내기로 전환. 주의: 스크립트 안 `history`는 되돌리기 스택이므로 브라우저 히스토리는 반드시 `window.history`로 부른다.
 - 저장 키: 여행 `tokki-trip:<U|A|B|C>`(옛 `suzi-hk-plan-v2:*`는 백업으로 남김), 설정 `tokki-settings-v1`, 대화 `tokki-chat-v1`, 정보 오버레이 `suzi-hk-info-v1`, 사용자 장소 `tokki-places-v1`, 사진·영상 IndexedDB `tokki/media`(기기 전용).
+- 물어보기 버튼·시트 제목은 이름이 비어 있으면 "수지"로 부른다(`askName()`, 2026-10-16 결정). 헤더 각주·공유 이름은 실제 입력값만.
 - 설정 저장소: localStorage `tokki-settings-v1` `{v, profile:{name}}`. 이후 conn·last 등도 여기로 모은다(설계 2.10).
 
 ## 로드맵 (2026-10-14 사용자 확정)

@@ -840,6 +840,10 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
 .tl li.gap{padding-block:0;border-top:0}
 .tl li.gap .c{font-size:12px;color:var(--muted);font-family:var(--mono);padding:2px 0}
 .customwrap{padding:0 16px 8px;flex:none}
+.georow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0 4px}
+.georow .hint{flex:1;min-width:0}
+.geolist{display:grid;gap:6px;padding:4px 0 8px}
+.geolist .pl .w{overflow-wrap:anywhere}
 .customform{padding:6px 0 0}
 .tl li.bridge{padding-block:4px;border-top:0}
 .tl li.bridge .c{display:flex;align-items:center;gap:8px;font-size:13.5px;background:var(--blush);border-radius:10px;padding:8px 10px}
@@ -1054,7 +1058,7 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
     </div>
   </div>
   <input class="search" id="search" type="search" placeholder="장소 이름으로 찾기" aria-label="장소 찾기">
-  <div class="customwrap"><button class="linkbtn" id="customToggle" type="button">목록에 없는 장소 직접 넣기</button>
+  <div class="customwrap"><div class="georow" id="geoRow" hidden><button class="ghost" id="geoBtn" type="button">지도에서 찾기</button><span class="hint" id="geoHint"></span></div><div class="geolist" id="geoList" hidden></div><button class="linkbtn" id="customToggle" type="button">목록에 없는 장소 직접 넣기</button>
    <form class="cform customform" id="customForm" autocomplete="off" hidden>
     <label>장소 이름 <input id="cpName" type="text" maxlength="60" placeholder="예: 카페 OO"></label>
     <div class="row"><label>종류 <select id="cpKind"><option>명소</option><option>식당</option><option>카페</option><option>전망</option><option>쇼핑</option><option>교통</option></select></label><label>지역 <select id="cpArea"></select></label></div>
@@ -2066,20 +2070,55 @@ function openAdd(day){
   addSel=null; addArea="전체"; addsheet.hidden=false; scrim.hidden=false; fab.hidden=true;
   const ds=document.getElementById('addDay'); ds.innerHTML=plan.days.map((d,i)=>`<option value="${i+1}">Day ${i+1}</option>`).join(''); ds.value=String(day||1);
   document.getElementById('addKey').checked=false; document.getElementById('search').value='';
-  renderCatalog(); updateAddForm(); setTimeout(()=>document.getElementById('search').focus(),50);
+  renderCatalog(); geoReset(); updateAddForm(); setTimeout(()=>document.getElementById('search').focus(),50);
 }
 function closeAdd(){ addsheet.hidden=true; scrim.hidden=true; fab.hidden=false; }
 function renderCatalog(){
   const qv=document.getElementById('search').value.trim().toLowerCase();
   const list=allPlaces().filter(p=>(addArea==="전체"||p.area===addArea)&&(!qv||p.n.toLowerCase().includes(qv)||p.q.toLowerCase().includes(qv)));
   document.getElementById('areas').innerHTML=["전체",...AREAS].map(a=>`<button class="chip${a===addArea?' on':''}" type="button" data-a="${esc(a)}">${esc(a)}</button>`).join('');
-  document.getElementById('catalog').innerHTML=list.length?list.map(p=>`<button class="pl${addSel===p?' on':''}" type="button" data-q="${esc(p.q)}" aria-pressed="${addSel===p}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)}</span><span class="w">${esc(p.why)}</span></button>`).join(''):'<p class="hint">찾는 장소가 없어요. 토끼에게 "○○ 넣어줘"라고 해 보세요.</p>';
+  document.getElementById('catalog').innerHTML=list.length?list.map(p=>`<button class="pl${addSel===p?' on':''}" type="button" data-q="${esc(p.q)}" aria-pressed="${addSel===p}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)}</span><span class="w">${esc(p.why)}</span></button>`).join(''):'<p class="hint">목록에는 없어요. 위 "지도에서 찾기"를 누르거나(영어·한자 이름이 잘 찾혀요) 토끼에게 "○○ 넣어줘"라고 해 보세요.</p>';
 }
 function updateAddForm(){ document.getElementById('selName').textContent=addSel?'선택: '+addSel.n:'아래에서 장소를 고르세요'; document.getElementById('addGo').disabled=!addSel; }
 document.getElementById('addClose').onclick=closeAdd;
-document.getElementById('search').addEventListener('input',renderCatalog);
+document.getElementById('search').addEventListener('input',()=>{ renderCatalog(); geoReset(); });
 document.getElementById('areas').onclick=e=>{ const b=e.target.closest('.chip'); if(b){ addArea=b.dataset.a; renderCatalog(); } };
 document.getElementById('catalog').onclick=e=>{ const b=e.target.closest('.pl'); if(!b) return; addSel=allPlaces().find(p=>p.q===b.dataset.q)||null; renderCatalog(); updateAddForm(); };
+// 지도에서 찾기: OpenStreetMap Nominatim(키·서버 없음, 1초 1회 정책). 카탈로그에 없는 장소를 이름으로 찾아 좌표·종류까지 가져와 내 장소 목록(tokki-places-v1)에 넣는다.
+// 한국어 이름은 OSM에 name:ko가 있는 곳만 잡히므로 영어·한자 이름을 권한다. 홍콩·마카오 범위로 한정.
+const GEO_CACHE=new Map(); let geoBusy=false, geoLast=[];
+function geoReset(){ const q=document.getElementById('search').value.trim(); const row=document.getElementById('geoRow'); row.hidden=q.length<2; document.getElementById('geoBtn').textContent=q.length<2?'지도에서 찾기':`지도에서 "${q.slice(0,20)}" 찾기`; document.getElementById('geoHint').textContent=''; const L=document.getElementById('geoList'); L.hidden=true; L.innerHTML=''; geoLast=[]; }
+function geoKindOf(r){ const c=r.category||'', t=r.type||'', n=(r.name||'')+' '+((r.namedetails||{})['name:en']||'');
+  if(c==='tourism'&&/hotel|hostel|guest_house|apartment/.test(t)) return '호텔';
+  if(c==='amenity'&&/cafe|ice_cream|bubble_tea/.test(t)||c==='shop'&&/bakery|coffee|tea|pastry|confectionery/.test(t)||/cafe|bakery|egg tart/i.test(n)) return '카페';
+  if(c==='amenity'&&/restaurant|food_court|fast_food|bar|pub|biergarten/.test(t)) return '식당';
+  if(c==='tourism'&&/viewpoint/.test(t)||/peak|lookout|observation|sky ?terrace|tower/i.test(n)) return '전망';
+  if(c==='shop'||/mall|market|marketplace|department_store/.test(t)) return '쇼핑';
+  if(/ferry|pier/i.test(t+' '+n)) return '페리';
+  if(c==='railway'||c==='aeroway'||c==='public_transport'||/station|terminal|bus_stop|platform|stop_position|aerialway|cable_car/.test(t)) return '교통';
+  return '명소'; }
+async function geoSearch(q){ if(GEO_CACHE.has(q)) return GEO_CACHE.get(q);
+  const u=`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&namedetails=1&addressdetails=1&accept-language=ko,en&viewbox=113.45,22.05,114.45,22.57&bounded=1&q=${encodeURIComponent(q)}`;
+  const res=await fetch(u,{headers:{'Accept':'application/json'}}); if(!res.ok) throw new Error('http '+res.status); const arr=await res.json(); if(!Array.isArray(arr)) throw new Error('bad'); GEO_CACHE.set(q,arr); return arr; }
+function geoPlace(r){ const nd=r.namedetails||{}; const ascii=/^[\x20-\x7e]+$/; const en=nd['name:en']||(ascii.test(r.name||'')?r.name:''); const n=String(nd['name:ko']||r.name||en||'').replace(/\s+/g,' ').trim().slice(0,60); const lat=+r.lat, lng=+r.lon; const mac=lng<113.75;
+  const base=String(en||r.name||n).replace(/\s*,\s*$/,'').slice(0,80); const suf=mac?' Macau':' Hong Kong'; const q=/hong\s*kong|macau|macao|香港|澳門|澳门/i.test(base)?base:base+suf;
+  const a=r.address||{}; const addr=[a.road, a.neighbourhood||a.suburb||a.quarter||a.village||a.town, a.city_district||a.district||a.county||a.state_district].filter(Boolean).map(x=>String(x).trim()).filter((x,i,arr)=>arr.indexOf(x)===i).join(' · ');
+  return {n,q,lat,lng,why:'',note:'',area:areaOf({lat,lng}),kind:geoKindOf(r),custom:true,osm:(r.osm_type||'')+'/'+(r.osm_id||''),addr}; }
+document.getElementById('geoBtn').onclick=async ()=>{
+  const q=document.getElementById('search').value.trim().slice(0,80); if(q.length<2||geoBusy) return; geoBusy=true;
+  const hint=document.getElementById('geoHint'), L=document.getElementById('geoList'); hint.textContent='지도에서 찾는 중…'; L.hidden=true; L.innerHTML='';
+  try{ const arr=(await geoSearch(q)).filter(r=>isFinite(+r.lat)&&isFinite(+r.lon)&&inHK(+r.lat,+r.lon)&&!/shenzhen|深圳|선전|zhuhai|珠海|주하이|guangdong|广东|광둥/i.test(r.display_name||'')); geoLast=arr.map(geoPlace);
+    if(!geoLast.length){ hint.textContent=/[가-힣]/.test(q)?'지도에서 못 찾았어요. 영어나 한자 이름으로 다시 찾아 보세요.':'지도에서 못 찾았어요. 다른 표기로 해 보거나 "직접 넣기"로 좌표를 붙여 주세요.'; return; }
+    hint.textContent=`${geoLast.length}곳 찾음 · 누르면 선택돼요`;
+    L.innerHTML=geoLast.map((p,i)=>`<button class="pl" type="button" data-i="${i}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)} · ${esc(p.kind)}</span><span class="w">${esc(p.addr||'')}</span></button>`).join(''); L.hidden=false;
+  }catch(e){ hint.textContent='지도 검색이 지금 안 돼요. 잠시 뒤 다시 하거나 "직접 넣기"로 좌표를 붙여 주세요.'; }
+  finally{ geoBusy=false; }
+};
+document.getElementById('geoList').onclick=e=>{ const b=e.target.closest('.pl'); if(!b) return; const p=geoLast[+b.dataset.i]; if(!p) return;
+  const place={n:p.n,q:p.q,lat:p.lat,lng:p.lng,why:'',note:'',area:p.area,kind:p.kind,custom:true,osm:p.osm};
+  const k=CUSTOM_PLACES.findIndex(x=>x.q===place.q); if(k>=0) CUSTOM_PLACES[k]=place; else CUSTOM_PLACES.unshift(place); saveCustomPlaces();
+  addSel=CUSTOM_PLACES.find(x=>x.q===place.q); addArea="전체"; document.getElementById('search').value=''; geoReset(); renderCatalog(); updateAddForm();
+  document.getElementById('selName').textContent='선택: '+place.n+' · 지도에서 찾음'; document.getElementById('addsheet').querySelector('.sheet-in').scrollTop=0; };
 // 목록에 없는 장소 직접 넣기
 document.getElementById('customToggle').onclick=()=>{ const f=document.getElementById('customForm'); f.hidden=!f.hidden; if(!f.hidden){ const sel=f.querySelector('#cpArea'); sel.innerHTML=Object.keys(LODGE_AREAS).map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join(''); setTimeout(()=>f.querySelector('#cpName').focus(),50); } };
 document.getElementById('customCancel').onclick=()=>{ document.getElementById('customForm').hidden=true; };
@@ -2215,11 +2254,12 @@ var SETTINGS={v:1,profile:{name:""}};
 try{ const s0=JSON.parse(localStorage.getItem(SETTINGS_KEY)||"null"); if(s0&&typeof s0==="object") SETTINGS={...SETTINGS,...s0,profile:{...SETTINGS.profile,...(s0.profile||{})}}; }catch(e){}
 function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS)); }catch(e){} }
 function travelerName(){ return String(SETTINGS.profile.name||"").replace(/[\u0000-\u001f]/g,"").trim().slice(0,20); }
-function askTo(topic){ const n=travelerName(); return (n?n+"에게 ":"")+(topic?topic+" ":"")+"물어보기"; }
+function askName(){ return travelerName()||"수지"; } // 이름을 안 적었을 땐 아직은 "수지"로 부른다(2026-10-16 사용자 결정). 헤더 각주·공유 이름은 실제 입력값만 쓴다
+function askTo(topic){ return askName()+"에게 "+(topic?topic+" ":"")+"물어보기"; }
 function applyProfile(){
   const n=travelerName();
   const who=document.getElementById('who'); if(who){ who.textContent=n?`${n}의 여정`:''; who.hidden=!n; }
-  const tt=document.getElementById('suziTitleTxt'); if(tt) tt.textContent=n?`${n}, 무엇이든 물어보세요`:'무엇이든 물어보세요';
+  const tt=document.getElementById('suziTitleTxt'); if(tt) tt.textContent=`${askName()}, 무엇이든 물어보세요`;
   fab.setAttribute('aria-label', askTo());
   if(typeof BACKEND!=="undefined"&&BACKEND) setFabLabel(askTo());
 }
