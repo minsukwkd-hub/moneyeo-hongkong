@@ -1020,6 +1020,7 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
     <span id="shareConfirm" hidden><label class="hint"><input type="checkbox" id="shareFl" checked> 항공편·숙소 포함</label> <button class="ghost" id="shareGo" type="button" style="color:var(--accent);font-weight:700">링크 만들기</button> <button class="ghost" id="shareNo" type="button">취소</button></span>
     <span id="importConfirm" hidden><button class="ghost" id="importYes" type="button" style="color:var(--pin)">네, 당신의 여정을 덮어쓰기</button> <button class="ghost" id="importNo" type="button">취소</button></span>
     <span id="ioMsg" class="hint" hidden></span>
+    <span id="orphanLine" class="hint" hidden></span>
   </div>
 </section>
 
@@ -1988,10 +1989,19 @@ function mdbOpen(){ return new Promise((res,rej)=>{ if(MDB.db) return res(MDB.db
   rq.onsuccess=()=>{ MDB.db=rq.result; MDB.db.onversionchange=()=>{ try{ MDB.db.close(); }catch(e){} MDB.db=null; }; res(MDB.db); };
   rq.onerror=()=>rej(rq.error||new Error("사진 저장소를 열지 못했어요")); rq.onblocked=()=>rej(new Error("다른 탭이 사진 저장소를 쓰고 있어요")); }); }
 function mdbTx(mode,fn){ return mdbOpen().then(db=>new Promise((res,rej)=>{ const tx=db.transaction('media',mode); let rq=null; try{ rq=fn(tx.objectStore('media')); }catch(e){ rej(e); return; } tx.oncomplete=()=>res(rq&&('result' in rq)?rq.result:undefined); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); })); }
-const media={ put:rec=>mdbTx('readwrite',st=>st.put(rec)), del:id=>mdbTx('readwrite',st=>st.delete(id)), get:id=>mdbTx('readonly',st=>st.get(id)), byTrip:tripId=>mdbTx('readonly',st=>st.index('trip').getAll(tripId)) };
+const media={ put:rec=>mdbTx('readwrite',st=>st.put(rec)), del:id=>mdbTx('readwrite',st=>st.delete(id)), get:id=>mdbTx('readonly',st=>st.get(id)), byTrip:tripId=>mdbTx('readonly',st=>st.index('trip').getAll(tripId)), all:()=>mdbTx('readonly',st=>st.getAll()) };
 var MEDIA_IDX={}; // stopId -> [{id,kind,url(썸네일)}]
 function freeMediaIdx(){ Object.values(MEDIA_IDX).flat().forEach(m=>{ if(m.url) try{ URL.revokeObjectURL(m.url); }catch(e){} }); MEDIA_IDX={}; }
-async function loadMediaIndex(){ freeMediaIdx(); try{ const all=await media.byTrip(realTripId(variant)); (all||[]).sort((a,b)=>a.createdAt-b.createdAt).forEach(r=>{ (MEDIA_IDX[r.stopId]=MEDIA_IDX[r.stopId]||[]).push({id:r.id,kind:r.kind,url:r.thumb?URL.createObjectURL(r.thumb):null}); }); }catch(e){ MEDIA_IDX={}; } }
+async function loadMediaIndex(){ freeMediaIdx(); try{ const all=await media.byTrip(realTripId(variant)); (all||[]).sort((a,b)=>a.createdAt-b.createdAt).forEach(r=>{ (MEDIA_IDX[r.stopId]=MEDIA_IDX[r.stopId]||[]).push({id:r.id,kind:r.kind,url:r.thumb?URL.createObjectURL(r.thumb):null}); }); }catch(e){ MEDIA_IDX={}; } scanOrphans(); }
+// 고아 사진 정리: 장소가 빠졌거나 여행이 사라져 어디에도 안 보이는 사진·영상을 세어 하단 도구 줄에 "지우기"(2단계)로 보여 준다
+let ORPHANS=[];
+async function scanOrphans(){ const el=document.getElementById('orphanLine'); if(!el) return; let all=[]; try{ all=await media.all(); }catch(e){ return; }
+  const valid=new Set(); TRIPS.ids.forEach(id=>{ try{ const p=JSON.parse(localStorage.getItem('tokki-trip:'+id)||'null'); ((p&&p.days)||[]).forEach(d=>(d.items||[]).forEach(it=>valid.add(id+'|'+it.id))); }catch(e){} });
+  const orphans=(all||[]).filter(r=>!valid.has(r.tripId+'|'+r.stopId)); ORPHANS=orphans.map(r=>r.id);
+  if(!orphans.length){ el.hidden=true; return; }
+  const mb=orphans.reduce((a,r)=>a+(r.size||0),0)/1048576;
+  el.innerHTML=`장소가 사라져 안 보이는 사진·영상 ${orphans.length}개(${mb<0.1?'0.1MB 미만':mb.toFixed(1)+'MB'}) <button class="linkbtn" type="button" id="orphanDel">지우기</button>`; el.hidden=false; }
+document.getElementById('orphanLine').addEventListener('click',async e=>{ const b=e.target.closest('#orphanDel'); if(!b) return; if(!b.dataset.arm){ b.dataset.arm='1'; b.classList.add('warn'); b.textContent='정말 지우기'; return; } let n=0; for(const id of ORPHANS){ try{ await media.del(id); n++; }catch(e){} } toast(`${n}개를 지웠어요`); ORPHANS=[]; scanOrphans(); });
 function paintMedia(){ const IDX=(typeof MEDIA_IDX==='object'&&MEDIA_IDX)||{}; const ro=!(currentMeta()&&currentMeta().custom); document.querySelectorAll('.media[data-stop]').forEach(el=>{ const list=IDX[el.dataset.stop]||[]; if(ro){ el.innerHTML=''; return; } el.innerHTML=list.map(m=>`<button class="th ${m.kind==='video'?'v':''} ${m.url?'':'noimg'}" type="button" data-mid="${esc(m.id)}" aria-label="${m.kind==='video'?'영상':'사진'} 보기">${m.url?`<img src="${m.url}" alt="">`:(m.kind==='video'?'🎞':'🖼')}</button>`).join('')+`<button class="madd" type="button" aria-label="사진·영상 담기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>${list.length?'더 담기':'사진·영상 담기'}</button>`; }); }
 function toast(t,ms){ const el=document.getElementById('toast'); el.textContent=t; el.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>{ el.hidden=true; },ms||3500); }
 async function shrinkImage(file,maxEdge,quality){
@@ -2286,7 +2296,7 @@ document.getElementById('addGo').onclick=()=>{
 document.getElementById('days').addEventListener('click',e=>{
   const ab=e.target.closest('.addbtn'); if(ab){ openAdd(+ab.dataset.day); return; }
   const mv=e.target.closest('.mv'); if(mv){ const li=mv.closest('li'); const d=plan.days[+li.dataset.day], k=+li.dataset.idx; if(!d||!d.items[k]) return; snapshot(); if(moveStop(d,k,+mv.dataset.dir)){ save(); render(); const sec=document.getElementById('d'+(+li.dataset.day+1)); const nl=sec&&sec.querySelector(`li[data-idx="${k+(+mv.dataset.dir)}"] .mv[data-dir="${mv.dataset.dir}"]`); if(nl) nl.focus(); } return; }
-  const rm=e.target.closest('.rm'); if(rm){ const li=rm.closest('li'); const d=plan.days[+li.dataset.day]; if(!d||!d.items[+li.dataset.idx]) return; snapshot(); onStopRemoved(d,+li.dataset.idx); d.items.splice(+li.dataset.idx,1); save(); render(); return; }
+  const rm=e.target.closest('.rm'); if(rm){ const li=rm.closest('li'); const d=plan.days[+li.dataset.day]; if(!d||!d.items[+li.dataset.idx]) return; snapshot(); onStopRemoved(d,+li.dataset.idx); d.items.splice(+li.dataset.idx,1); save(); render(); scanOrphans(); return; }
   const bx=e.target.closest('.bx'); if(bx){ const li=bx.closest('li'); const d=plan.days[+li.dataset.day]; if(!d) return; const k=d.bridges.findIndex(b=>b.id===li.dataset.bid); if(k<0) return; snapshot(); d.bridges.splice(k,1); save(); render(); return; }
   const bb=e.target.closest('.brbtn'); if(bb){ openBridge(+bb.dataset.day); return; }
   const vb=e.target.closest('.vis'); if(vb){ const li=vb.closest('li'); const d=plan.days[+li.dataset.day]; const it=d&&d.items[+li.dataset.idx]; if(!it) return; snapshot(); setStatus(it, it.status==='visited'?undefined:'visited'); save(); render(); return; }
