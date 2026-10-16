@@ -32,10 +32,11 @@
 ## 진행 상태 (2026-10-16)
 - SUZI 프록시: **Cloudflare Worker 운영 중, 종단 검증 완료** https://suzi-proxy.suzi-proxy.workers.dev/ (계정 이메일 minsukwkd+cf@gmail.com). 시크릿은 `ANTHROPIC_API_KEY` 하나. **서버 토큰은 쓰지 않기로 결정**(Origin 제한·IP당 30회/분·월 한도로 방어). **실행 위치는 도쿄 고정(`[placement] region`)** — Anthropic이 홍콩(HKG) 발신을 403으로 막기 때문. 이 설정을 지우면 홍콩 현지에서 SUZI가 죽는다. Vercel 배포본(https://suzi-proxy.vercel.app/api/suzi, hnd1 고정)은 예비.
 - `SUZI_DEFAULT.url`은 Cloudflare 주소, `token`은 빈 값이 정상. 저장된 연결 설정은 사용자가 직접 바꾼 경우(`custom:true`)가 아니면 항상 `SUZI_DEFAULT`를 따른다.
-- 설계: `docs/설계.md`(v3, 개정 2)가 장기 구조·데이터 모델·착수 순서(M0~M4)의 기준. **M0·M1·M2 완료**(이름/토끼 호칭/인앱 띠 · 모델 v3+repo+SUZI id 도구 · 내보내기/불러오기 · 여행 정보 시트 · ▲▼ 순서/이동시간/부하 경고 · 직접 장소/챙김 메모). **M3 진행 중**: 사진·영상(기기 저장)·공유 링크·방문 체크/메모/지출/일기 완료, 남은 것은 여행 목록 홈. **추천 여정(A/B/C)은 보기 전용**(2026-10-16 결정): 항상 원본 로드·저장 없음·기록/사진/편집 UI 없음, SUZI 변경 도구는 `EDIT_TOOLS` 래퍼로 거절, 복사는 `import_template` 또는 "바탕으로 직접 꾸미기".
+- 설계: `docs/설계.md`(v3, 개정 2)가 장기 구조·데이터 모델·착수 순서(M0~M4)의 기준. **M0·M1·M2 완료**(이름/토끼 호칭/인앱 띠 · 모델 v3+repo+SUZI id 도구 · 내보내기/불러오기 · 여행 정보 시트 · ▲▼ 순서/이동시간/부하 경고 · 직접 장소/챙김 메모). **M3 완료**(사진·공유 링크·기록·여행 목록 홈). 다음은 M4(Cloudflare 통합: 사진 포함 공유·짧은 코드) 또는 장소 품질.
+- 여행 목록: `tokki-trips-v1` `{cur,ids}`; `U`는 현재 내 여행 포인터(`realTripId`), 저장 키 `tokki-trip:<id>`, 사진 tripId도 실제 id. 불러오기·복사는 `placeIntoMine`(빈 여행이면 그 자리, 아니면 새 여행). 시트 `#listsheet`, 도구 list_trips/open_trip/new_trip. **추천 여정(A/B/C)은 보기 전용**(2026-10-16 결정): 항상 원본 로드·저장 없음·기록/사진/편집 UI 없음, SUZI 변경 도구는 `EDIT_TOOLS` 래퍼로 거절, 복사는 `import_template` 또는 "바탕으로 직접 꾸미기".
 - 기록(M3b): `Stop.status|memo|cost{amount,cur}`, `Day.expenses[]`, `Day.journal{text,mood}`. 통화 HKD·MOP·KRW, 합계는 통화별(`spendOf`). 시트 `#recsheet`(장소 기록)·`#exsheet`(Day 지출)·`#journalsheet`(일기). 받은 여정(S)에서는 기록 불가. 공유 링크엔 안 실리고 내보내기엔 실린다. SUZI 도구 mark_visited / add_expense / set_journal.
 - 공유 링크(M3a): `toSlim`/`fromSlim`(슬림 포맷 v1) → deflate-raw → base64url → `#s=`(압축 불가 브라우저는 `#j=`). 받는 쪽은 부팅 때 해시를 풀어 "받은 여정"(variant `S`, `SHARED.meta`, 저장 안 함)으로 보여 주고 "내 여정으로 가져오기"로 `applyImport`. 1,800자 초과면 파일 내보내기로 전환. 주의: 스크립트 안 `history`는 되돌리기 스택이므로 브라우저 히스토리는 반드시 `window.history`로 부른다.
-- 저장 키: 여행 `tokki-trip:<U|A|B|C>`(옛 `suzi-hk-plan-v2:*`는 백업으로 남김), 설정 `tokki-settings-v1`, 대화 `tokki-chat-v1`, 정보 오버레이 `suzi-hk-info-v1`, 사용자 장소 `tokki-places-v1`, 사진·영상 IndexedDB `tokki/media`(기기 전용).
+- 저장 키: 여행 `tokki-trip:<U|t…>`(목록 `tokki-trips-v1`, 템플릿 A/B/C는 저장 안 함, 옛 `suzi-hk-plan-v2:*`는 백업으로 남김), 설정 `tokki-settings-v1`, 대화 `tokki-chat-v1`, 정보 오버레이 `suzi-hk-info-v1`, 사용자 장소 `tokki-places-v1`, 사진·영상 IndexedDB `tokki/media`(기기 전용).
 - 물어보기 버튼·시트 제목은 이름이 비어 있으면 "수지"로 부른다(`askName()`, 2026-10-16 결정). 헤더 각주·공유 이름은 실제 입력값만.
 - 설정 저장소: localStorage `tokki-settings-v1` `{v, profile:{name}}`. 이후 conn·last 등도 여기로 모은다(설계 2.10).
 
