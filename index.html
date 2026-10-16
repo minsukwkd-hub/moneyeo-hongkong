@@ -847,6 +847,23 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
 .tl li.bridge .bl input{width:18px;height:18px;accent-color:var(--accent);flex:none}
 .tl li.bridge.done .bl span{text-decoration:line-through;color:var(--muted)}
 .tl li.bridge .bx{border:0;background:none;font-size:18px;line-height:1;color:var(--muted);cursor:pointer;padding:0 2px}
+/* 기록(M3b): 다녀옴·건너뜀·메모·지출·일기 */
+.tl li.vis .nm{color:var(--muted)} .tl li.vis .pn{background:var(--accent)} .tl li.vis.hl .pn{background:var(--pin)}
+.tl li.skip .nm{text-decoration:line-through;color:var(--muted)} .tl li.skip .pn{background:var(--line);color:var(--muted)}
+.tl .vis,.tl .rec{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:2px 9px;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;line-height:1.4}
+.tl .vis.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tl .cost{font-family:var(--mono);font-size:12px;color:var(--gold);font-weight:700}
+.tl .memo{font-size:13px;margin:0;background:var(--bg);border-radius:8px;padding:6px 9px;white-space:pre-wrap;overflow-wrap:anywhere}
+.journal{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 15px;display:grid;gap:4px}
+.journal .jl{font-size:11.5px;letter-spacing:.1em;color:var(--blush-ink);font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.journal .jl .linkbtn{letter-spacing:0;font-size:12px}
+.journal p{margin:0;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.cform textarea{font:inherit;font-size:15px;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--bg);color:var(--fg);width:100%;resize:vertical;min-height:72px}
+.exlist{display:grid;gap:6px;font-size:13.5px}
+.exlist div{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--bg);border-radius:8px;padding:6px 10px}
+.exlist .amt{font-family:var(--mono);font-weight:700;white-space:nowrap} .exlist .m{flex:1;min-width:0;color:var(--muted);overflow-wrap:anywhere}
+.exlist .bx{border:0;background:none;font-size:18px;line-height:1;color:var(--muted);cursor:pointer;padding:0 2px}
+.moods{display:flex;gap:6px;flex-wrap:wrap}
 .bpresets{display:flex;gap:6px;flex-wrap:wrap}
 .media{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px}
 .media .th{width:56px;height:56px;border-radius:12px;border:2px solid var(--blush);background:var(--surface);padding:0;overflow:hidden;position:relative;cursor:pointer}
@@ -943,6 +960,7 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
   <div class="callout" id="sharedBar" hidden></div>
   <div class="status" id="status"></div>
   <p class="statushint" id="statusHint" hidden></p>
+  <p class="statushint" id="spend" hidden></p>
 </header>
 
 <nav class="tabs" aria-label="일정 바로가기" id="tabs"></nav>
@@ -1066,6 +1084,56 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
   </form>
  </div>
 </div>
+<div class="sheet" id="recsheet" role="dialog" aria-modal="true" aria-labelledby="recTitle" hidden>
+ <div class="sheet-in">
+  <div class="sh-head">
+    <div class="av plus" aria-hidden="true">✓</div>
+    <div><h2 id="recTitle">장소 기록</h2><p id="recSub">다녀온 뒤 한 줄 메모와 쓴 돈을 남겨요. 이 기기에만 저장돼요</p></div>
+    <button class="x" id="recClose" type="button" aria-label="닫기">×</button>
+  </div>
+  <form class="cform tripform" id="recForm" autocomplete="off">
+   <label>어떻게 됐나요</label>
+   <div class="moods" id="recStatus"><button class="chip" type="button" data-v="">계획대로</button><button class="chip" type="button" data-v="visited">다녀옴</button><button class="chip" type="button" data-v="skipped">건너뜀</button></div>
+   <label>메모 <textarea id="recMemo" maxlength="300" rows="3" placeholder="예: 창가 자리, 밀크티가 맛있었음"></textarea></label>
+   <div class="row"><label>쓴 돈 <input id="recAmt" type="number" inputmode="decimal" min="0" step="1" placeholder="0"></label><label>통화 <select id="recCur"><option value="HKD">HK$ 홍콩달러</option><option value="MOP">MOP 파타카</option><option value="KRW">₩ 원</option></select></label></div>
+   <div class="row"><button class="send" type="submit">저장</button><button class="ghost" type="button" id="recCancel">취소</button></div>
+  </form>
+ </div>
+</div>
+
+<div class="sheet" id="exsheet" role="dialog" aria-modal="true" aria-labelledby="exTitle" hidden>
+ <div class="sheet-in">
+  <div class="sh-head">
+    <div class="av plus" aria-hidden="true">$</div>
+    <div><h2 id="exTitle">지출</h2><p id="exSub">장소에 묶이지 않는 지출(교통·간식 등)을 적어요. 합계는 통화별로만 보여 줘요</p></div>
+    <button class="x" id="exClose" type="button" aria-label="닫기">×</button>
+  </div>
+  <form class="cform tripform" id="exForm" autocomplete="off">
+   <div class="exlist" id="exList"></div>
+   <p class="fine" id="exTotal"></p>
+   <div class="row"><label>금액 <input id="exAmt" type="number" inputmode="decimal" min="0" step="1" placeholder="0"></label><label>통화 <select id="exCur"><option value="HKD">HK$ 홍콩달러</option><option value="MOP">MOP 파타카</option><option value="KRW">₩ 원</option></select></label></div>
+   <label>무엇에 <input id="exMemo" type="text" maxlength="80" placeholder="예: 옥토퍼스 충전, 택시"></label>
+   <div class="row"><button class="send" type="submit">추가</button><button class="ghost" type="button" id="exCancel">닫기</button></div>
+  </form>
+ </div>
+</div>
+
+<div class="sheet" id="journalsheet" role="dialog" aria-modal="true" aria-labelledby="jTitle" hidden>
+ <div class="sheet-in">
+  <div class="sh-head">
+    <div class="av plus" aria-hidden="true">✎</div>
+    <div><h2 id="jTitle">여행 일기</h2><p id="jSub">오늘 하루를 몇 줄로 남겨요. 이 기기에만 저장되고 공유 링크엔 실리지 않아요</p></div>
+    <button class="x" id="jClose" type="button" aria-label="닫기">×</button>
+  </div>
+  <form class="cform tripform" id="jForm" autocomplete="off">
+   <label>오늘 기분</label>
+   <div class="moods" id="jMoods"></div>
+   <label>일기 <textarea id="jText" maxlength="2000" rows="7" placeholder="예: 피크 야경이 생각보다 추웠지만 엄마가 제일 좋아했던 곳"></textarea></label>
+   <div class="row"><button class="send" type="submit">저장</button><button class="ghost" type="button" id="jDelete">지우기</button><button class="ghost" type="button" id="jCancel">취소</button></div>
+  </form>
+ </div>
+</div>
+
 <div class="sheet" id="tripsheet" role="dialog" aria-modal="true" aria-labelledby="tripTitle" hidden>
  <div class="sheet-in">
   <div class="sh-head">
@@ -1369,6 +1437,12 @@ let variant=(()=>{ try{ const v=localStorage.getItem(VKEY); return metaOf(v)?v:"
 // 문서 하나 = 여행(trip + days[]). 날·장소에 id, 장소에 origin(template|me|suzi), trip.dates는 {label,start?,end?},
 // trip.flights는 {in:{code},out:{code}}. render는 데이터에 쓰지 않는다(옛 it.i는 읽을 때 지운다).
 const DOC_V=3;
+// 기록(M3b, 설계 2.4·2.6): Stop.status(visited|skipped)·memo·cost{amount,cur}, Day.expenses[{id,amount,cur,memo}], Day.journal{text,mood,updatedAt}. 합계는 통화별로만, 환산 없음.
+const CURS=["HKD","MOP","KRW"];
+function fmtMoney(a,cur){ const n=Math.round(+a||0).toLocaleString("ko-KR"); return cur==="HKD"?"HK$"+n:cur==="MOP"?"MOP "+n:"₩"+n; }
+function spendOf(days){ const m={}; days.forEach(d=>{ d.items.forEach(it=>{ if(it.cost&&+it.cost.amount>0) m[it.cost.cur]=(m[it.cost.cur]||0)+(+it.cost.amount); }); (d.expenses||[]).forEach(x=>{ if(+x.amount>0) m[x.cur]=(m[x.cur]||0)+(+x.amount); }); }); return m; }
+function spendLabel(m){ return CURS.filter(c=>m[c]>0).map(c=>fmtMoney(m[c],c)).join(" · "); }
+const MOODS=[["😊","좋았어요"],["😌","편안했어요"],["🥹","뭉클했어요"],["😮","놀라웠어요"],["😴","피곤했어요"]];
 function newId(){ const a=new Uint8Array(8); crypto.getRandomValues(a); return Array.from(a,b=>(b%36).toString(36)).join(''); }
 function normalizeDoc(p){
   if(!p||typeof p!=="object") p={};
@@ -1385,7 +1459,8 @@ function normalizeDoc(p){
     if(!d.id) d.id=newId();
     if(!Array.isArray(d.items)) d.items=[];
     if(!Array.isArray(d.bridges)) d.bridges=[]; d.bridges.forEach(b=>{ if(b&&typeof b==="object"&&!b.id) b.id=newId(); });
-    if(!Array.isArray(d.expenses)) d.expenses=[];
+    if(!Array.isArray(d.expenses)) d.expenses=[]; d.expenses.forEach(x=>{ if(x&&typeof x==="object"&&!x.id) x.id=newId(); });
+    if(d.journal&&(typeof d.journal!=="object"||!d.journal.text)) delete d.journal;
     d.items.forEach(it=>{
       if(!it||typeof it!=="object") return;
       if(!it.id) it.id=newId();
@@ -1508,7 +1583,7 @@ const BRIDGE_PRESETS={
   "혼자":["물 한 병 사기","쉬어 가기","사진 한 장","옥토퍼스 잔액 확인","보조배터리 확인"]
 };
 // 복사·불러오기 때 id를 새로 발급하되 브릿지의 after 연결은 따라오게 한다
-function reissueIds(doc){ doc.days.forEach(d=>{ const map=new Map(); d.id=newId(); (d.items||[]).forEach(it=>{ const nid=newId(); if(it.id) map.set(it.id,nid); it.id=nid; }); (d.bridges||[]).forEach(b=>{ b.id=newId(); b.after=b.after&&map.has(b.after)?map.get(b.after):null; }); }); return doc; }
+function reissueIds(doc){ doc.days.forEach(d=>{ const map=new Map(); d.id=newId(); (d.items||[]).forEach(it=>{ const nid=newId(); if(it.id) map.set(it.id,nid); it.id=nid; }); (d.bridges||[]).forEach(b=>{ b.id=newId(); b.after=b.after&&map.has(b.after)?map.get(b.after):null; }); (d.expenses||[]).forEach(x=>{ x.id=newId(); }); }); return doc; }
 // 순서 바꾸기: 시간 칸(슬롯)은 그대로 두고 장소만 자리를 바꾼다. 시간순 자동 정렬과 충돌하지 않는다.
 function moveStop(d,k,dir){ const j=k+dir; if(j<0||j>=d.items.length) return false; const a=d.items[k], b=d.items[j]; const ta=a.t; a.t=b.t; b.t=ta; d.items[k]=b; d.items[j]=a; return true; }
 function reorderStops(d,ids){
@@ -1602,12 +1677,13 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!bigwrap.hidden) c
 document.addEventListener("click",e=>{ const b=e.target.closest(".expand"); if(b) openBig(b.dataset.big,b.dataset.title||"홍콩·마카오 전체 지도"); });
 // ---- render ----
 function render(){
-  const P=currentMeta(), custom=!!P.custom, shared=!!P.shared, live=custom||shared; // live: 데이터에서 핵심 장소·소제목·마카오 날을 계산(직접 꾸미기·받은 여정)
+  const P=currentMeta(), custom=!!P.custom, shared=!!P.shared, live=custom||shared, rec=!shared; // rec: 다녀옴·메모·지출·일기 기록 가능(받은 여정 제외) // live: 데이터에서 핵심 장소·소제목·마카오 날을 계산(직접 꾸미기·받은 여정)
   const t=plan.trip||{};
   let macauDay=t.macau||"미정";
   if(live){ const mi=plan.days.findIndex(d=>d.items.some(isMacauPt)); macauDay = mi>=0 ? "Day "+(mi+1) : "미정"; }
   const who=document.getElementById('who'); if(shared){ who.textContent=SHARED&&SHARED.owner?`${SHARED.owner}의 여정`:'받은 여정'; who.hidden=false; } else if(typeof SETTINGS==="object"&&SETTINGS&&SETTINGS.profile){ const n=travelerName(); who.textContent=n?`${n}의 여정`:''; who.hidden=!n; }
   const sb=document.getElementById('sharedBar'); sb.hidden=!shared;
+  const sp=document.getElementById('spend'), spl=spendLabel(spendOf(plan.days)); sp.textContent=spl?`지출 합계 · ${spl}`:''; sp.hidden=!spl;
   if(shared){ const U=loadPlan('U'), already=!!(U.importedFrom&&SHARED&&U.importedFrom.hash===SHARED.hash);
     sb.innerHTML=`<b>${esc(SHARED&&SHARED.owner?SHARED.owner+'님이 보낸 여정':'링크로 받은 여정')}</b> 보기만 할 수 있어요. 토끼에게 바꿔 달라고 해도 이 화면에서만 바뀌고 저장되지 않아요. `
       +(already?`<button class="linkbtn" type="button" id="sharedOpen">이미 가져왔어요 · 당신의 여정 열기 →</button> <button class="linkbtn" type="button" id="sharedImport">다시 가져오기</button>`:`<button class="linkbtn" type="button" id="sharedImport">내 여정으로 가져오기 →</button>`); }
@@ -1623,9 +1699,10 @@ function render(){
     const sec=document.createElement('section'); sec.id='d'+(di+1);
     const keyIt=d.items.find(x=>x.key&&!x.hotel);
     const keyCard=live?(keyIt?{name:keyIt.n,why:keyIt.why}:null):d.key;
-    const LD=dayLoad(d), warn=custom?loadWarning(d):''; const sub0=live?`${LD.count}곳 · 약 ${fmtMin(LD.total)} · 오늘의 한 곳 ${keyIt?keyIt.n:'미정'}`:(d.sub||''); const dd=dayDate(di); const sub=dd?(dd+(sub0?' · '+sub0:'')):sub0;
+    const LD=dayLoad(d), warn=custom?loadWarning(d):''; const sub0=live?`${LD.count}곳 · 약 ${fmtMin(LD.total)} · 오늘의 한 곳 ${keyIt?keyIt.n:'미정'}`:(d.sub||''); const dd=dayDate(di); const nv=d.items.filter(x=>x.status==='visited').length, dsp=spendLabel(spendOf([d])); const recSum=[nv?`다녀옴 ${nv}/${d.items.length}`:'',dsp?`지출 ${dsp}`:''].filter(Boolean).join(' · '); const sub=[dd,sub0,recSum].filter(Boolean).join(' · ');
     sec.innerHTML=`<div class="dayhead"><div class="daynum">${String(di+1).padStart(2,'0')}</div><h2>${esc(d.title)}</h2><div class="sub">${esc(sub)}</div></div>`
-      +(custom?`<div class="dayact"><button class="ghost addbtn" type="button" data-day="${di+1}">＋ 장소 넣기</button><button class="ghost brbtn" type="button" data-day="${di+1}">♡ 챙김 메모</button>${d.items.some(x=>!x.hotel)?'':'<span class="hint">아직 비어 있어요. 장소를 골라 넣어 보세요.</span>'}</div>`:'')
+      +(rec?`<div class="dayact">${custom?`<button class="ghost addbtn" type="button" data-day="${di+1}">＋ 장소 넣기</button><button class="ghost brbtn" type="button" data-day="${di+1}">♡ 챙김 메모</button>`:''}<button class="ghost exbtn" type="button" data-day="${di+1}">지출 적기</button><button class="ghost jbtn" type="button" data-day="${di+1}">${d.journal?'일기 고치기':'일기 쓰기'}</button>${custom&&!d.items.some(x=>!x.hotel)?'<span class="hint">아직 비어 있어요. 장소를 골라 넣어 보세요.</span>':''}</div>`:'')
+      +(rec&&d.journal?`<div class="journal"><div class="jl"><span>여행 일기${d.journal.mood?' '+esc(d.journal.mood):''}</span><button class="linkbtn jedit" type="button" data-day="${di+1}">고치기</button></div><p>${esc(d.journal.text)}</p></div>`:'')
       +(warn?`<div class="callout warn"><b>오늘은 좀 빡빡해요</b> ${esc(warn)}</div>`:'')
       +(isMac(d)?`<div class="callout"><b>날짜 고정 예정</b> 마카오 행사 날짜가 정해지면 토끼에게 "마카오를 Day ○로 옮겨줘"라고 하세요. 11월 하순 그랑프리 기간엔 도로 통제와 페리 혼잡이 있을 수 있어요.</div>`:'')
       +(keyCard?`<div class="key"><div class="lbl">오늘의 한 곳</div><h3>${esc(keyCard.name)}</h3><p>${esc(keyCard.why||'')}</p></div>`:'')
@@ -1636,11 +1713,11 @@ function render(){
     d.items.forEach((it,ii)=>{
       const added=it.origin==='me'||it.origin==='suzi';
       const li=document.createElement('li');
-      li.className=(it.key?'hl ':'')+(added?'new ':'')+(custom?'ed':'');
+      li.className=(it.key?'hl ':'')+(added?'new ':'')+(it.status==='visited'?'vis ':'')+(it.status==='skipped'?'skip ':'')+(custom?'ed':'');
       li.dataset.day=di; li.dataset.idx=ii;
       const tag=added?`<span class="tag">${it.origin==='me'?'직접 추가':'토끼 추가'}</span>`:'';
       const tcell=custom?`<div class="t"><input type="time" class="tin" value="${esc(it.t||'')}" aria-label="시간"></div>`:`<div class="t">${esc(it.t||'')}</div>`;
-      li.innerHTML=`${tcell}<div class="c"><div class="name"><span class="pn">${ii+1}</span><button class="nm" type="button" aria-label="${esc(it.n)} 정보 보기">${esc(it.n)}${tag}</button></div><p class="why">${esc(it.why||'')}</p>${it.note?`<p class="note">${esc(it.note)}</p>`:''}<div class="act"><a class="gm" href="${gm(it.q||it.n)}" target="_blank" rel="noopener">구글 지도에서 열기 ↗</a>${custom?`<button class="mv" type="button" data-dir="-1" aria-label="위로" ${ii===0?'disabled':''}>▲</button><button class="mv" type="button" data-dir="1" aria-label="아래로" ${ii===d.items.length-1?'disabled':''}>▼</button><button class="rm" type="button">빼기</button>`:''}</div><div class="media" data-stop="${esc(it.id)}"></div></div>`;
+      li.innerHTML=`${tcell}<div class="c"><div class="name"><span class="pn">${ii+1}</span><button class="nm" type="button" aria-label="${esc(it.n)} 정보 보기">${esc(it.n)}${tag}</button></div><p class="why">${esc(it.why||'')}</p>${it.note?`<p class="note">${esc(it.note)}</p>`:''}${rec&&it.memo?`<p class="memo">${esc(it.memo)}</p>`:''}<div class="act"><a class="gm" href="${gm(it.q||it.n)}" target="_blank" rel="noopener">구글 지도에서 열기 ↗</a>${custom?`<button class="mv" type="button" data-dir="-1" aria-label="위로" ${ii===0?'disabled':''}>▲</button><button class="mv" type="button" data-dir="1" aria-label="아래로" ${ii===d.items.length-1?'disabled':''}>▼</button><button class="rm" type="button">빼기</button>`:''}${rec?`<button class="vis${it.status==='visited'?' on':''}" type="button" aria-pressed="${it.status==='visited'}">${it.status==='visited'?'✓ 다녀옴':(it.status==='skipped'?'건너뜀':'다녀옴')}</button><button class="rec" type="button">메모·지출</button>${it.cost?`<span class="cost">${esc(fmtMoney(it.cost.amount,it.cost.cur))}</span>`:''}`:''}</div><div class="media" data-stop="${esc(it.id)}"></div></div>`;
       ol.appendChild(li);
       bridgesAt(d,it.id).forEach(b=>ol.appendChild(bridgeLi(b)));
       const nx=d.items[ii+1]; if(nx){ const tr=travelBetween(it,nx); if(tr&&tr.label){ const g=document.createElement('li'); g.className='gap'+(custom?' ed':''); g.setAttribute('aria-hidden','true'); g.innerHTML=`<div class="t"></div><div class="c">↓ ${esc(tr.label)}</div>`; ol.appendChild(g); } }
@@ -1696,6 +1773,7 @@ async function exportDoc(){
 // 불러온 내용은 신뢰하지 않는다: 글자 길이·좌표 범위·개수 상한 (설계 2.9)
 function validateDoc(p){
   const S=(v,n)=>String(v==null?"":v).replace(/[\u0000-\u001f]/g,"").slice(0,n);
+  const M=(v,n)=>String(v==null?"":v).replace(/\r\n?/g,"\n").replace(/[\u0000-\u0009\u000b-\u001f]/g,"").slice(0,n); // 메모·일기는 줄바꿈 유지
   if(!p||typeof p!=="object"||!Array.isArray(p.days)||!p.days.length) throw new Error("여정 파일이 아니에요");
   const out={trip:{},days:[]}; if(p.title) out.title=S(p.title,40);
   const t=p.trip&&typeof p.trip==="object"?p.trip:{};
@@ -1707,9 +1785,11 @@ function validateDoc(p){
   const L=Array.isArray(t.lodging)&&t.lodging[0]; if(L&&L.name&&isFinite(+L.lat)&&isFinite(+L.lng)) out.trip.lodging=[{name:S(L.name,60),area:S(L.area,20),q:S(L.q||L.name,120),lat:+L.lat,lng:+L.lng}];
   out.days=p.days.slice(0,30).map(d=>{ d=d&&typeof d==="object"?d:{};
     const items=(Array.isArray(d.items)?d.items:[]).filter(it=>it&&typeof it==="object"&&isFinite(+it.lat)&&isFinite(+it.lng)&&Math.abs(+it.lat)<=90&&Math.abs(+it.lng)<=180).slice(0,50)
-      .map(it=>({id:it.id?S(it.id,16):undefined,t:S(it.t,5),n:S(it.n,80),q:S(it.q||it.n,120),lat:+it.lat,lng:+it.lng,why:S(it.why,500),note:it.note?S(it.note,500):undefined,key:!!it.key,hotel:it.hotel?true:undefined,origin:["me","suzi","template"].includes(it.origin)?it.origin:"me",kind:KIND[it.kind]?it.kind:undefined,dur:(+it.dur>0&&+it.dur<=600)?Math.round(+it.dur):undefined}));
+      .map(it=>({id:it.id?S(it.id,16):undefined,t:S(it.t,5),n:S(it.n,80),q:S(it.q||it.n,120),lat:+it.lat,lng:+it.lng,why:S(it.why,500),note:it.note?S(it.note,500):undefined,key:!!it.key,hotel:it.hotel?true:undefined,origin:["me","suzi","template"].includes(it.origin)?it.origin:"me",kind:KIND[it.kind]?it.kind:undefined,dur:(+it.dur>0&&+it.dur<=600)?Math.round(+it.dur):undefined,status:(it.status==="visited"||it.status==="skipped")?it.status:undefined,visitedAt:(+it.visitedAt>0)?+it.visitedAt:undefined,memo:it.memo?M(it.memo,300):undefined,cost:(it.cost&&+it.cost.amount>0&&+it.cost.amount<=1e9&&CURS.includes(it.cost.cur))?{amount:+it.cost.amount,cur:it.cost.cur}:undefined}));
     const bridges=(Array.isArray(d.bridges)?d.bridges:[]).slice(0,30).map(b=>({after:b&&b.after?S(b.after,16):null,text:S(b&&b.text,120),done:!!(b&&b.done)}));
-    return {title:S(d.title,80)||"",sub:d.sub?S(d.sub,120):undefined,macau:d.macau?true:undefined,items,bridges};
+    const expenses=(Array.isArray(d.expenses)?d.expenses:[]).filter(x=>x&&typeof x==="object"&&+x.amount>0&&+x.amount<=1e9&&CURS.includes(x.cur)).slice(0,100).map(x=>({amount:+x.amount,cur:x.cur,memo:x.memo?S(x.memo,80):undefined}));
+    const journal=(d.journal&&typeof d.journal==="object"&&d.journal.text)?{text:M(d.journal.text,2000),mood:d.journal.mood?S(d.journal.mood,4):undefined,updatedAt:(+d.journal.updatedAt>0)?+d.journal.updatedAt:Date.now()}:undefined;
+    return {title:S(d.title,80)||"",sub:d.sub?S(d.sub,120):undefined,macau:d.macau?true:undefined,items,bridges,expenses,journal};
   });
   return normalizeDoc(out);
 }
@@ -1908,6 +1988,46 @@ document.getElementById('bPresets').onclick=e=>{ const b=e.target.closest('.chip
 document.getElementById('bridgeClose').onclick=closeBridge; document.getElementById('bridgeCancel').onclick=closeBridge;
 document.getElementById('bridgeForm').onsubmit=e=>{ e.preventDefault(); const text=document.getElementById('bText').value.trim().slice(0,60); if(!text) return; const d=plan.days[bridgeDay]; if(!d) return; const after=document.getElementById('bAfter').value||null; snapshot(); d.bridges.push({id:newId(),after,text,done:false}); save(); render(); closeBridge(); const sec=document.getElementById('d'+(bridgeDay+1)); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'}); };
 
+// ---- 기록 (M3b): 장소 다녀옴·메모·지출, Day 지출, 여행 일기 ----
+const recsheet=document.getElementById('recsheet'), exsheet=document.getElementById('exsheet'), journalsheet=document.getElementById('journalsheet');
+let recTarget=null, exDay=-1, jDay=-1, recStatus="";
+function setStatus(it,st){ if(st==='visited'){ it.status='visited'; it.visitedAt=Date.now(); } else if(st==='skipped'){ it.status='skipped'; delete it.visitedAt; } else { delete it.status; delete it.visitedAt; } }
+function paintRecStatus(){ document.querySelectorAll('#recStatus .chip').forEach(b=>b.classList.toggle('on',(b.dataset.v||"")===recStatus)); }
+function openRec(dayI,idx){
+  const d=plan.days[dayI], it=d&&d.items[idx]; if(!it) return; recTarget={dayI,idx};
+  document.getElementById('recTitle').textContent=it.n; document.getElementById('recSub').textContent=`Day ${dayI+1} · ${it.t||''} · 다녀온 뒤 한 줄 메모와 쓴 돈을 남겨요`;
+  recStatus=it.status||""; paintRecStatus();
+  document.getElementById('recMemo').value=it.memo||''; document.getElementById('recAmt').value=it.cost?it.cost.amount:''; document.getElementById('recCur').value=it.cost?it.cost.cur:(isMacauPt(it)?'MOP':'HKD');
+  recsheet.hidden=false; scrim.hidden=false; fab.hidden=true; setTimeout(()=>document.getElementById('recMemo').focus(),50);
+}
+function closeRec(){ recsheet.hidden=true; scrim.hidden=true; fab.hidden=false; }
+document.getElementById('recStatus').onclick=e=>{ const b=e.target.closest('.chip'); if(!b) return; recStatus=b.dataset.v||""; paintRecStatus(); };
+document.getElementById('recClose').onclick=closeRec; document.getElementById('recCancel').onclick=closeRec;
+document.getElementById('recForm').onsubmit=e=>{ e.preventDefault(); if(!recTarget) return; const d=plan.days[recTarget.dayI], it=d&&d.items[recTarget.idx]; if(!it) return;
+  const memo=document.getElementById('recMemo').value.trim().slice(0,300), amt=+document.getElementById('recAmt').value, cur=document.getElementById('recCur').value;
+  snapshot(); setStatus(it,recStatus); if(memo) it.memo=memo; else delete it.memo; if(amt>0&&CURS.includes(cur)) it.cost={amount:Math.round(amt),cur}; else delete it.cost;
+  save(); render(); closeRec(); };
+function paintEx(){ const d=plan.days[exDay]; if(!d) return; const list=document.getElementById('exList');
+  list.innerHTML=(d.expenses||[]).map(x=>`<div data-eid="${esc(x.id)}"><span class="amt">${esc(fmtMoney(x.amount,x.cur))}</span><span class="m">${esc(x.memo||'')}</span><button class="bx" type="button" aria-label="지출 빼기">×</button></div>`).join('')||'<div><span class="m">아직 적은 지출이 없어요</span></div>';
+  const sp=spendLabel(spendOf([d])), st=spendLabel(spendOf(plan.days)); document.getElementById('exTotal').textContent=`Day ${exDay+1} 합계 ${sp||'0'} (장소에 적은 돈 포함) · 여행 전체 ${st||'0'}`; }
+function openEx(day){ exDay=dayIdx(day); document.getElementById('exTitle').textContent=`Day ${day} 지출`; document.getElementById('exForm').reset(); const d=plan.days[exDay]; document.getElementById('exCur').value=d.items.some(isMacauPt)?'MOP':'HKD'; paintEx(); exsheet.hidden=false; scrim.hidden=false; fab.hidden=true; setTimeout(()=>document.getElementById('exAmt').focus(),50); }
+function closeEx(){ exsheet.hidden=true; scrim.hidden=true; fab.hidden=false; render(); }
+document.getElementById('exClose').onclick=closeEx; document.getElementById('exCancel').onclick=closeEx;
+document.getElementById('exList').onclick=e=>{ const b=e.target.closest('.bx'); if(!b) return; const id=b.closest('[data-eid]').dataset.eid; const d=plan.days[exDay]; const k=(d.expenses||[]).findIndex(x=>x.id===id); if(k<0) return; snapshot(); d.expenses.splice(k,1); save(); paintEx(); };
+document.getElementById('exForm').onsubmit=e=>{ e.preventDefault(); const d=plan.days[exDay]; if(!d) return; const amt=+document.getElementById('exAmt').value, cur=document.getElementById('exCur').value, memo=document.getElementById('exMemo').value.trim().slice(0,80);
+  if(!(amt>0)||!CURS.includes(cur)){ document.getElementById('exAmt').focus(); return; } snapshot(); d.expenses.push({id:newId(),amount:Math.round(amt),cur,memo:memo||undefined,at:Date.now()}); save(); document.getElementById('exAmt').value=''; document.getElementById('exMemo').value=''; paintEx(); document.getElementById('exAmt').focus(); };
+let jMood="";
+function paintMoods(){ document.querySelectorAll('#jMoods .chip').forEach(b=>b.classList.toggle('on',b.dataset.m===jMood)); }
+document.getElementById('jMoods').innerHTML=MOODS.map(([m,t])=>`<button class="chip" type="button" data-m="${m}">${m} ${t}</button>`).join('');
+document.getElementById('jMoods').onclick=e=>{ const b=e.target.closest('.chip'); if(!b) return; jMood=jMood===b.dataset.m?"":b.dataset.m; paintMoods(); };
+function openJournal(day){ jDay=dayIdx(day); const d=plan.days[jDay]; document.getElementById('jTitle').textContent=`Day ${day} 일기`; const dd=dayDate(jDay); document.getElementById('jSub').textContent=`${dd?dd+' · ':''}${d.title} · 이 기기에만 저장되고 공유 링크엔 실리지 않아요`;
+  jMood=(d.journal&&d.journal.mood)||""; paintMoods(); document.getElementById('jText').value=(d.journal&&d.journal.text)||''; document.getElementById('jDelete').hidden=!d.journal;
+  journalsheet.hidden=false; scrim.hidden=false; fab.hidden=true; setTimeout(()=>document.getElementById('jText').focus(),50); }
+function closeJournal(){ journalsheet.hidden=true; scrim.hidden=true; fab.hidden=false; }
+document.getElementById('jClose').onclick=closeJournal; document.getElementById('jCancel').onclick=closeJournal;
+document.getElementById('jDelete').onclick=()=>{ const d=plan.days[jDay]; if(!d||!d.journal) return; snapshot(); delete d.journal; save(); render(); closeJournal(); };
+document.getElementById('jForm').onsubmit=e=>{ e.preventDefault(); const d=plan.days[jDay]; if(!d) return; const text=document.getElementById('jText').value.trim().slice(0,2000); snapshot(); if(text) d.journal={text,mood:jMood||undefined,updatedAt:Date.now()}; else delete d.journal; save(); render(); closeJournal(); const sec=document.getElementById('d'+(jDay+1)); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'}); };
+
 // ---- 여행 정보 시트 (M2a) ----
 const tripsheet=document.getElementById('tripsheet');
 function statusHint(t){ const el=document.getElementById('statusHint'); el.textContent=t||''; el.hidden=!t; if(t) setTimeout(()=>{ if(el.textContent===t) el.hidden=true; },6000); }
@@ -1989,6 +2109,10 @@ document.getElementById('days').addEventListener('click',e=>{
   const rm=e.target.closest('.rm'); if(rm){ const li=rm.closest('li'); const d=plan.days[+li.dataset.day]; if(!d||!d.items[+li.dataset.idx]) return; snapshot(); onStopRemoved(d,+li.dataset.idx); d.items.splice(+li.dataset.idx,1); save(); render(); return; }
   const bx=e.target.closest('.bx'); if(bx){ const li=bx.closest('li'); const d=plan.days[+li.dataset.day]; if(!d) return; const k=d.bridges.findIndex(b=>b.id===li.dataset.bid); if(k<0) return; snapshot(); d.bridges.splice(k,1); save(); render(); return; }
   const bb=e.target.closest('.brbtn'); if(bb){ openBridge(+bb.dataset.day); return; }
+  const vb=e.target.closest('.vis'); if(vb){ const li=vb.closest('li'); const d=plan.days[+li.dataset.day]; const it=d&&d.items[+li.dataset.idx]; if(!it) return; snapshot(); setStatus(it, it.status==='visited'?undefined:'visited'); save(); render(); return; }
+  const rb=e.target.closest('.rec'); if(rb){ const li=rb.closest('li'); openRec(+li.dataset.day,+li.dataset.idx); return; }
+  const eb=e.target.closest('.exbtn'); if(eb){ openEx(+eb.dataset.day); return; }
+  const jb=e.target.closest('.jbtn,.jedit'); if(jb){ openJournal(+jb.dataset.day); return; }
 });
 document.getElementById('days').addEventListener('change',e=>{
   const bd=e.target.closest('.bdone'); if(bd){ const li=bd.closest('li'); const d=plan.days[+li.dataset.day]; const b=d&&d.bridges.find(x=>x.id===li.dataset.bid); if(!b) return; b.done=bd.checked; b.doneAt=bd.checked?Date.now():undefined; li.classList.toggle('done',bd.checked); save(); return; }
@@ -2049,9 +2173,9 @@ document.getElementById('chips').onclick=e=>{const b=e.target.closest('.chip'); 
 
 function openSheet(){ sheet.hidden=false; scrim.hidden=false; fab.hidden=true; if(!log.children.length){ if(!loadChat()) hello(); } setTimeout(()=>q.focus(),50); }
 function closeSheet(){ sheet.hidden=true; scrim.hidden=true; fab.hidden=false; fab.focus(); }
-fab.onclick=openSheet; document.getElementById('close').onclick=closeSheet; scrim.onclick=()=>{ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); if(!bridgesheet.hidden) closeBridge(); };
+fab.onclick=openSheet; document.getElementById('close').onclick=closeSheet; scrim.onclick=()=>{ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); if(!bridgesheet.hidden) closeBridge(); if(!recsheet.hidden) closeRec(); if(!exsheet.hidden) closeEx(); if(!journalsheet.hidden) closeJournal(); };
 document.getElementById('fnLink').onclick=()=>closeSheet();
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); if(!bridgesheet.hidden) closeBridge(); if(!mediaview.hidden) closeMedia(); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(!sheet.hidden) closeSheet(); if(!addsheet.hidden) closeAdd(); if(!infosheet.hidden) closeInfo(); if(!tripsheet.hidden) closeTrip(); if(!bridgesheet.hidden) closeBridge(); if(!recsheet.hidden) closeRec(); if(!exsheet.hidden) closeEx(); if(!journalsheet.hidden) closeJournal(); if(!mediaview.hidden) closeMedia(); } });
 
 function bubble(cls,html){ const d=document.createElement('div'); d.className='msg '+cls; d.innerHTML=html; log.appendChild(d); log.scrollTop=log.scrollHeight; return d; }
 function md(s){
@@ -2220,13 +2344,14 @@ async function apiChat(msgs, opts){
 }
 
 function compactPlan(){
-  return JSON.stringify({trip:plan.trip, days:plan.days.map((d,i)=>({day:i+1,title:d.title,macau:!!d.macau,key:d.key&&d.key.name,load:(L=>`${L.count}곳 · 약 ${fmtMin(L.total)}${L.walk>0?' · 도보 '+L.walk.toFixed(1)+'km':''}`)(dayLoad(d)),warn:loadWarning(d)||undefined,items:d.items.map((it,j)=>({id:it.id,idx:j+1,t:it.t,n:it.n,dur:durOf(it)})),bridges:d.bridges.length?d.bridges.map(b=>({id:b.id,after:b.after,text:b.text,done:!!b.done})):undefined}))});
+  return JSON.stringify({trip:plan.trip, days:plan.days.map((d,i)=>({day:i+1,title:d.title,macau:!!d.macau,key:d.key&&d.key.name,load:(L=>`${L.count}곳 · 약 ${fmtMin(L.total)}${L.walk>0?' · 도보 '+L.walk.toFixed(1)+'km':''}`)(dayLoad(d)),warn:loadWarning(d)||undefined,spend:spendLabel(spendOf([d]))||undefined,journal:d.journal?(d.journal.mood?d.journal.mood+' ':'')+d.journal.text.slice(0,120):undefined,items:d.items.map((it,j)=>({id:it.id,idx:j+1,t:it.t,n:it.n,dur:durOf(it),status:it.status||undefined,memo:it.memo?it.memo.slice(0,60):undefined,cost:it.cost?fmtMoney(it.cost.amount,it.cost.cur):undefined})),bridges:d.bridges.length?d.bridges.map(b=>({id:b.id,after:b.after,text:b.text,done:!!b.done})):undefined}))});
 }
 const RULES=()=>`너는 "토끼"야. ${travelerName()?`여행자 이름은 "${travelerName()}"이고, `:""}엄마와 딸의 홍콩·마카오 3박 4일 여행을 돕는 다정하고 센스 있는 토끼 여행 도우미야. 자신을 부를 땐 "토끼"라고 해.
 ${tripBrief()} 날짜·항공편·숙소가 미정이면 사용자가 알려줄 때 set_trip_info로 적어 줘.
 [주요 주제] 호텔, 경로, 명소, 항공권, 요즘 여행 핫 키워드.
 [답변 규칙] 한국어 존댓말, 휴대폰 화면 기준 짧게(최대 10줄 안팎), 필요하면 '- ' 목록. 실시간 검색을 못 하니 가격·운항편·영업시간·최신 트렌드는 '최근 기준 확인 필요'라고 짧게 밝혀. 모르는 건 지어내지 마. 토끼다운 말투는 한 답변에 한 번 정도만 살짝(예: 깡총).
 [일정 반영] 사용자가 넣어줘/바꿔줘/빼줘/옮겨줘처럼 일정 변경을 요청할 때만 도구를 써. 장소를 고치거나 뺄 땐 현재 일정 JSON의 id를 stop_id로 넘겨(순번은 변경 뒤 바뀔 수 있어). 도구가 돌려준 items가 최신 상태야. 각 Day의 load는 머무는 시간과 이동을 더한 대략값, warn이 있으면 그날이 빡빡하다는 뜻이니 덜어 내기를 먼저 제안해. 순서만 바꿀 땐 reorder_stops, 시간을 바꿀 땐 update_stop. 동행을 배려하는 따뜻한 한 줄(비타민, 컨디션 확인, 쉬어 가기)은 add_bridge로 일정 사이에 끼워 넣을 수 있어. 사용자가 원하거나 일정이 빡빡할 때 한두 개만 제안해. 장소를 넣을 땐 실제 위치에 가까운 위도·경도와 구글지도 검색어(영문)를 함께 넣고, 하루 핵심 1곳 원칙이 깨지지 않게 해. 변경 후엔 무엇을 바꿨는지 한두 줄로 알려줘.${toolsOK?'':' (이번 화면에선 일정 직접 수정이 안 되니, 바꿀 내용을 말로만 제안해.)'}
+[기록] 사용자가 어디를 다녀왔다/건너뛰었다고 하면 mark_visited, 얼마를 썼다고 하면 add_expense(통화는 HKD·MOP·KRW 중 하나, 장소가 분명하면 stop_id를 함께), 오늘 일기를 써 달라고 하면 사용자가 말해 준 내용으로 set_journal(네가 지어내지 마). 일정 JSON의 status·memo·cost·spend·journal이 지금까지의 기록이야. "오늘 어땠어" 같은 대화에선 기록을 바탕으로 다정하게 되짚어 줘.
 [여정 선택] 상단에 여정 선택지가 있어: U=당신의 여정(사용자가 직접 꾸미는 일정), A=첫 번째 여정(현재 여정), B=두 번째 여정(조금 다른 여정), C=세 번째 여정(다른 여정). 지금 선택된 여정은 "${currentMeta().ord} · ${currentMeta().name}"이야. 사용자가 다른 여정으로 바꿔 달라고 하면 choose_plan 도구를 써. 일정 변경 도구는 항상 지금 선택된 여정에만 적용돼.
 [운영 정보] 각 장소의 영업시간·요금은 페이지에 저장된 참고값(기준일 ${INFO_ASOF})이야. 사용자가 "○○ 영업시간/요금/휴무를 △△로 바꿔줘"라고 알려주면 update_info 도구로 고쳐. 네가 아는 값으로 임의로 고치지는 마.
 [현재 일정 JSON]
@@ -2261,6 +2386,17 @@ const TOOLS=[
  {name:"remove_bridge",description:"챙김 메모를 빼. 반환: 뺀 문구.",
   inputSchema:{type:"object",properties:{bridge_id:{type:"string"}},required:["bridge_id"]},
   execute(i){ for(const d of plan.days){ const k=d.bridges.findIndex(b=>b.id===String(i.bridge_id)); if(k>=0){ snapshot(); const [b]=d.bridges.splice(k,1); save(); render(); return {removed:b.text}; } } throw new Error("그 id의 메모가 없어요"); }},
+ {name:"mark_visited",description:"장소를 다녀옴/건너뜀/계획대로로 표시해. 반환: 장소명과 상태.",
+  inputSchema:{type:"object",properties:{stop_id:{type:"string"},status:{type:"string",enum:["visited","skipped","planned"]}},required:["stop_id"]},
+  execute(i){ const pos=locateStop(i); if(variant==="S") throw new Error("받은 여정에는 기록할 수 없어요. 먼저 내 여정으로 가져와야 해요"); snapshot(); setStatus(pos.it, i.status==="skipped"?"skipped":(i.status==="planned"?undefined:"visited")); save(); render(); return {ok:true,n:pos.it.n,status:pos.it.status||"planned"}; }},
+ {name:"add_expense",description:"지출을 적어. stop_id가 있으면 그 장소의 비용으로(덮어씀), 없으면 그날의 기타 지출로 추가. 통화는 HKD·MOP·KRW. 반환: 그날 합계(통화별).",
+  inputSchema:{type:"object",properties:{day:{type:"integer"},stop_id:{type:"string"},amount:{type:"number"},cur:{type:"string",enum:["HKD","MOP","KRW"]},memo:{type:"string"}},required:["amount","cur"]},
+  execute(i){ if(variant==="S") throw new Error("받은 여정에는 기록할 수 없어요"); const amt=Math.round(+i.amount); if(!(amt>0)||!CURS.includes(i.cur)) throw new Error("amount는 0보다 커야 하고 cur는 HKD·MOP·KRW 중 하나예요"); snapshot();
+    let d; if(i.stop_id){ const pos=locateStop(i); d=pos.d; pos.it.cost={amount:amt,cur:i.cur}; if(i.memo&&!pos.it.memo) pos.it.memo=String(i.memo).slice(0,300); } else { d=plan.days[dayIdx(i.day)]; d.expenses.push({id:newId(),amount:amt,cur:i.cur,memo:i.memo?String(i.memo).slice(0,80):undefined,at:Date.now()}); }
+    save(); render(); return {ok:true,day:plan.days.indexOf(d)+1,day_total:spendLabel(spendOf([d])),trip_total:spendLabel(spendOf(plan.days))}; }},
+ {name:"set_journal",description:"그날의 여행 일기를 적어(기존 일기를 덮어씀). 사용자가 말한 내용을 정리해서 적고, 지어내지 마. mood는 😊 😌 🥹 😮 😴 중 하나. 반환: 저장된 길이.",
+  inputSchema:{type:"object",properties:{day:{type:"integer"},text:{type:"string"},mood:{type:"string"}},required:["day","text"]},
+  execute(i){ if(variant==="S") throw new Error("받은 여정에는 기록할 수 없어요"); const d=plan.days[dayIdx(i.day)]; const text=String(i.text||"").trim().slice(0,2000); if(!text) throw new Error("text가 비었어요"); snapshot(); const mood=MOODS.some(([m])=>m===i.mood)?i.mood:undefined; d.journal={text,mood,updatedAt:Date.now()}; save(); render(); return {ok:true,day:Number(i.day),chars:text.length}; }},
  {name:"swap_days",description:"두 Day의 일정을 통째로 맞바꿔. 마카오 날짜를 옮길 때 사용. 반환: 바뀐 Day 순서.",
   inputSchema:{type:"object",properties:{a:{type:"integer"},b:{type:"integer"}},required:["a","b"]},
   execute(i){ const a=dayIdx(i.a), b=dayIdx(i.b); snapshot(); [plan.days[a],plan.days[b]]=[plan.days[b],plan.days[a]];
