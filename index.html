@@ -1017,7 +1017,8 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
     <button class="ghost" id="exportBtn" type="button">여정 내보내기</button>
     <button class="ghost" id="importBtn" type="button">여정 불러오기</button><input type="file" id="importFile" accept="application/json,.json" hidden>
     <button class="ghost" id="shareBtn" type="button">여정 공유 링크</button>
-    <span id="shareConfirm" hidden><label class="hint"><input type="checkbox" id="shareFl" checked> 항공편·숙소 포함</label> <button class="ghost" id="shareGo" type="button" style="color:var(--accent);font-weight:700">링크 만들기</button> <button class="ghost" id="shareNo" type="button">취소</button></span>
+    <span id="shareConfirm" hidden><label class="hint"><input type="checkbox" id="shareFl" checked> 항공편·숙소 포함</label> <label class="hint" id="sharePhWrap" hidden><input type="checkbox" id="sharePh"> 사진 포함 <span id="sharePhN"></span></label> <button class="ghost" id="shareGo" type="button" style="color:var(--accent);font-weight:700">링크 만들기</button> <button class="ghost" id="shareNo" type="button">취소</button></span>
+    <span id="shareReady" hidden><span class="hint" id="shareReadyTxt"></span> <button class="ghost" id="shareSend" type="button" style="color:var(--accent);font-weight:700">보내기</button> <button class="ghost" id="shareCopy" type="button">복사</button></span>
     <span id="importConfirm" hidden><button class="ghost" id="importYes" type="button" style="color:var(--pin)">네, 당신의 여정을 덮어쓰기</button> <button class="ghost" id="importNo" type="button">취소</button></span>
     <span id="ioMsg" class="hint" hidden></span>
     <span id="orphanLine" class="hint" hidden></span>
@@ -1761,7 +1762,8 @@ function render(){
   const sb=document.getElementById('sharedBar'); sb.hidden=!shared;
   const sp=document.getElementById('spend'), spl=spendLabel(spendOf(plan.days)); sp.textContent=spl?`지출 합계 · ${spl}`:''; sp.hidden=!spl;
   if(shared){ const already=TRIPS.ids.some(x=>{ try{ const p=JSON.parse(localStorage.getItem('tokki-trip:'+x)||'null'); return !!(p&&p.importedFrom&&SHARED&&p.importedFrom.hash===SHARED.hash); }catch(e){ return false; } });
-    sb.innerHTML=`<b>${esc(SHARED&&SHARED.owner?SHARED.owner+'님이 보낸 여정':'링크로 받은 여정')}</b> 보기만 할 수 있어요. 토끼에게 바꿔 달라고 해도 이 화면에서만 바뀌고 저장되지 않아요. `
+    const phN=SHARED&&SHARED.media?Object.values(SHARED.media).reduce((a,l)=>a+l.length,0):0;
+    sb.innerHTML=`<b>${esc(SHARED&&SHARED.owner?SHARED.owner+'님이 보낸 여정':'링크로 받은 여정')}</b> 보기만 할 수 있어요.${phN?` 사진 ${phN}장이 함께 왔어요.`:''} 토끼에게 바꿔 달라고 해도 이 화면에서만 바뀌고 저장되지 않아요. `
       +(already?`<button class="linkbtn" type="button" id="sharedOpen">이미 가져왔어요 · 당신의 여정 열기 →</button> <button class="linkbtn" type="button" id="sharedImport">다시 가져오기</button>`:`<button class="linkbtn" type="button" id="sharedImport">내 여정으로 가져오기 →</button>`); }
   const fl=t.flights||{}, L0=lodgingOf(), nights=plan.days.length>1?`${plan.days.length-1}박`:"";
   const st=[["여행 날짜",tripDatesLabel()],["숙소",L0.isDefault?`셩완 · ${nights||'3박'} (임시)`:`${L0.name} · ${L0.area}${nights?' · '+nights:''}`],["항공편",[fl.in&&fl.in.code,fl.out&&fl.out.code].filter(Boolean).join(" / ")||"미정"],["마카오 가는 날",macauDay]];
@@ -1826,7 +1828,7 @@ function render(){
       {lat:mid[0],lng:mid[1],html:`<svg style="position:absolute;transform:translate(6px,-34px);width:30px;height:30px;color:var(--fg)" aria-hidden="true"><use href="#rabbit"/></svg>`}]});
 })();
 
-const SHARE_BOOT=/^#[sj]=/.test(location.hash||''); if(!SHARE_BOOT) render();
+const SHARE_BOOT=/^#[sjc]=/.test(location.hash||''); if(!SHARE_BOOT) render();
 
 // ---- undo / reset ----
 document.getElementById('undo').onclick=()=>{ if(!history.length) return; plan=normalizeDoc(JSON.parse(history.pop())); save(); render(); document.getElementById('undo').disabled=!history.length; };
@@ -1938,42 +1940,80 @@ async function buildShareLink(opt){
   if(!frag) frag="j="+B64U.enc(u8);
   return location.origin+location.pathname+location.search+"#"+frag;
 }
-let shareLinks=null; // {full, slim} 미리 만들어 두고, 버튼 탭 순간에는 바로 공유 시트를 연다(사용자 동작 안에서 호출해야 하는 브라우저 대비)
-async function prepareShare(){ shareLinks=null; try{ const [full,slim]=await Promise.all([buildShareLink({}),buildShareLink({flights:false,lodging:false})]); shareLinks={full,slim}; }catch(e){ shareLinks=null; } }
-async function sendShare(url){
-  const owner=travelerName(); const title=owner?`${owner}의 여정`:'토끼의 여정'; const text=`${title} · ${plan.title||currentMeta().name} · 링크를 열면 일정과 지도를 보고 내 여정으로 가져올 수 있어요`;
-  if(navigator.share){ try{ await navigator.share({title,text,url}); ioMsg('여정 링크를 보냈어요'); return; }catch(e){ if(e&&e.name==="AbortError") return; } }
-  try{ await navigator.clipboard.writeText(url); ioMsg('여정 링크를 복사했어요 · 카카오톡 등에 붙여 넣으세요'); return; }catch(e){}
-  window.prompt('이 링크를 복사해서 보내세요', url);
+// 서버 공유(M4): Worker가 공유 코드(KV, 90일)와 사진(R2)을 보관한다. 서버가 없거나 실패하면 긴 링크(#s=)로 돌아간다.
+function shareApi(){ return String((typeof CONN!=="undefined"&&CONN.url)||SUZI_DEFAULT.url||"").replace(/\/+$/,''); }
+let shareCapsCache=null;
+async function shareCaps(){ const api=shareApi(); if(!api) return null; if(shareCapsCache&&Date.now()-shareCapsCache.at<300000) return shareCapsCache.v; try{ const r=await fetch(api+'/',{cache:'no-store'}); const j=r.ok?await r.json():null; shareCapsCache={at:Date.now(),v:j&&j.share?j:null}; }catch(e){ shareCapsCache={at:Date.now(),v:null}; } return shareCapsCache.v; }
+async function collectSharePhotos(){ let all=[]; try{ all=await media.byTrip(realTripId(variant)); }catch(e){} const ph=[], uploads=[]; let n=0;
+  plan.days.forEach((d,di)=>d.items.forEach((it,si)=>{ const recs=all.filter(r=>r.stopId===it.id&&r.kind==='image'&&r.blob).sort((a,b)=>a.createdAt-b.createdAt); if(!recs.length) return; const ids=[]; for(const r of recs){ if(n>=30) break; n++; ids.push(r.id); uploads.push({key:r.id,blob:r.blob}); if(r.thumb) uploads.push({key:r.id+'_t',blob:r.thumb}); } if(ids.length) ph.push([di,si,ids]); }));
+  return {ph:ph.length?ph:null, uploads, count:n}; }
+async function uploadSharePhotos(code,uploads){ const api=shareApi(); let done=0, fail=0; const q=uploads.slice();
+  const worker=async()=>{ while(q.length){ const u=q.shift(); try{ const r=await fetch(`${api}/p/${code}/${u.key}`,{method:'PUT',headers:{'content-type':u.blob.type||'image/jpeg'},body:u.blob}); if(!r.ok) fail++; }catch(e){ fail++; } done++; ioMsg(`사진 올리는 중 ${Math.min(done,uploads.length)}/${uploads.length}`); } };
+  await Promise.all([worker(),worker(),worker()]); return {done,fail}; }
+let shareOut=null;
+async function makeShareUrl(inc,withPhotos){
+  const slim=toSlim(plan,inc?{}:{flights:false,lodging:false}); const u8=new TextEncoder().encode(JSON.stringify(slim));
+  let frag=null; if(typeof CompressionStream!=="undefined"){ try{ frag=B64U.enc(await deflateRaw(u8)); }catch(e){ frag=null; } }
+  const base=location.origin+location.pathname+location.search; const cap=await shareCaps();
+  if(frag&&cap&&cap.share){
+    let ph=null, uploads=[], count=0;
+    if(withPhotos&&cap.photos){ ioMsg('사진 모으는 중…'); const c=await collectSharePhotos(); ph=c.ph; uploads=c.uploads; count=c.count; }
+    try{ const r=await fetch(shareApi()+'/share',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({s:frag,ph,owner:travelerName()||undefined})});
+      if(r.ok){ const j=await r.json(); if(j&&j.code){ let up={done:0,fail:0}; if(uploads.length) up=await uploadSharePhotos(j.code,uploads); return {url:base+'#c='+j.code,short:true,photos:count,fail:up.fail,days:cap.ttlDays||90}; } } }catch(e){}
+  }
+  return {url:frag?base+'#s='+frag:base+'#j='+B64U.enc(u8),short:false,photos:0};
 }
-document.getElementById('shareBtn').onclick=()=>{ const c=document.getElementById('shareConfirm'); c.hidden=!c.hidden; if(!c.hidden) prepareShare(); };
+async function sendShare(url){
+  const owner=travelerName(); const title=owner?`${owner}의 여정`:'토끼의 여정'; const text=`${title} · ${plan.title||currentMeta().name} · 링크를 열면 일정과 지도를 보고 내 여행으로 가져올 수 있어요`;
+  if(navigator.share){ try{ await navigator.share({title,text,url}); ioMsg('여정 링크를 보냈어요'); return true; }catch(e){ if(e&&e.name==="AbortError") return false; } }
+  return copyShare(url);
+}
+async function copyShare(url){ try{ await navigator.clipboard.writeText(url); ioMsg('여정 링크를 복사했어요 · 카카오톡 등에 붙여 넣으세요'); return true; }catch(e){} window.prompt('이 링크를 복사해서 보내세요', url); return true; }
+document.getElementById('shareBtn').onclick=async()=>{ const c=document.getElementById('shareConfirm'); c.hidden=!c.hidden; document.getElementById('shareReady').hidden=true; if(c.hidden) return; const w=document.getElementById('sharePhWrap'); w.hidden=true; const cap=await shareCaps(); if(cap&&cap.photos){ let n=0; try{ n=(await media.byTrip(realTripId(variant))).filter(r=>r.kind==='image').length; }catch(e){} if(n){ document.getElementById('sharePhN').textContent=`(${Math.min(n,30)}장${n>30?' · 최대 30장':''})`; w.hidden=false; } } };
 document.getElementById('shareNo').onclick=()=>{ document.getElementById('shareConfirm').hidden=true; };
 document.getElementById('shareGo').onclick=async ()=>{
-  const inc=document.getElementById('shareFl').checked; let url=shareLinks?(inc?shareLinks.full:shareLinks.slim):null;
-  if(!url){ try{ url=await buildShareLink(inc?{}:{flights:false,lodging:false}); }catch(e){ ioMsg('링크를 만들지 못했어요'); return; } }
+  const inc=document.getElementById('shareFl').checked, withPh=!document.getElementById('sharePhWrap').hidden&&document.getElementById('sharePh').checked;
+  const go=document.getElementById('shareGo'); go.disabled=true; ioMsg('링크 만드는 중…');
+  try{ shareOut=await makeShareUrl(inc,withPh); }catch(e){ shareOut=null; } finally{ go.disabled=false; }
+  if(!shareOut){ ioMsg('링크를 만들지 못했어요'); return; }
   document.getElementById('shareConfirm').hidden=true;
-  if(url.length>SHARE_MAX){ ioMsg(`여정이 커서 링크 대신 파일로 보내요 (${url.length}자)`); exportDoc(); return; }
-  sendShare(url);
+  if(!shareOut.short&&shareOut.url.length>SHARE_MAX){ ioMsg(`여정이 커서 링크 대신 파일로 보내요 (${shareOut.url.length}자)`); exportDoc(); return; }
+  document.getElementById('shareReadyTxt').textContent=shareOut.short?`짧은 링크가 준비됐어요 · ${shareOut.days}일 동안 열 수 있어요${shareOut.photos?` · 사진 ${shareOut.photos}장${shareOut.fail?` (${shareOut.fail}장 실패)`:''}`:''}`:'링크가 준비됐어요 (서버 없이 긴 링크)';
+  document.getElementById('shareReady').hidden=false; ioMsg('');
 };
+document.getElementById('shareSend').onclick=async()=>{ if(!shareOut) return; const ok=await sendShare(shareOut.url); if(ok) document.getElementById('shareReady').hidden=true; };
+document.getElementById('shareCopy').onclick=async()=>{ if(!shareOut) return; await copyShare(shareOut.url); document.getElementById('shareReady').hidden=true; };
 // 링크로 열기: #s= / #j= 를 읽어 "받은 여정"(S)으로 보여 준다. 저장하지 않고, 가져오기를 눌러야 "당신의 여정"이 된다.
 async function openSharedFromHash(){
-  const m=/^#(s|j)=([A-Za-z0-9_-]{4,})$/.exec(location.hash||""); if(!m) return false;
-  let json=null;
-  try{ const u8=B64U.dec(m[2]); const raw=m[1]==='s'?await inflateRaw(u8):u8; json=JSON.parse(new TextDecoder().decode(raw)); }
-  catch(e){ statusHint(m[1]==='s'&&typeof DecompressionStream==="undefined"?'이 브라우저는 여정 링크를 열 수 없어요. iOS 16.4 이상 또는 최신 Chrome으로 열어 주세요':'여정 링크를 읽지 못했어요'); return false; }
-  let doc=null, dropped=0;
-  try{ const r=fromSlim(json); dropped=r.dropped; doc=validateDoc(r.doc); }catch(e){ statusHint(e.message||'여정 링크가 아니에요'); return false; }
+  const m=/^#(s|j|c)=([A-Za-z0-9_-]{4,})$/.exec(location.hash||""); if(!m) return false;
+  await 0; // 스크립트 끝까지 정의된 뒤에(SUZI_DEFAULT 등) 진행
+  let json=null, code=null, ph=null;
+  try{
+    let frag=m[2], kind=m[1];
+    if(kind==='c'){ code=m[2].toLowerCase(); statusHint('공유 코드를 불러오는 중…'); const r=await fetch(`${shareApi()}/s/${code}`); if(!r.ok){ statusHint(r.status===404?'이 공유 링크는 기한이 지났거나 없어요. 보낸 분에게 다시 받아 주세요':'공유 서버에 연결하지 못했어요. 잠시 뒤 다시 열어 주세요'); return false; } const j=await r.json(); frag=String(j.s||''); ph=Array.isArray(j.ph)?j.ph:null; kind='s'; }
+    const u8=B64U.dec(frag); const raw=kind==='s'?await inflateRaw(u8):u8; json=JSON.parse(new TextDecoder().decode(raw)); }
+  catch(e){ statusHint(m[1]!=='j'&&typeof DecompressionStream==="undefined"?'이 브라우저는 여정 링크를 열 수 없어요. iOS 16.4 이상 또는 최신 Chrome으로 열어 주세요':'여정 링크를 읽지 못했어요'); return false; }
+  let doc=null, dropped=0, mediaMap=null;
+  try{ const r=fromSlim(json); dropped=r.dropped;
+    if(ph&&code){ mediaMap={}; const api=shareApi(); ph.forEach(e=>{ const it=r.doc.days[e[0]]&&r.doc.days[e[0]].items[e[1]]; if(!it||!Array.isArray(e[2])) return; mediaMap[it.id]=e[2].map(id=>({id,kind:'image',url:`${api}/p/${code}/${id}_t`,full:`${api}/p/${code}/${id}`})); }); }
+    doc=validateDoc(r.doc); }catch(e){ statusHint(e.message||'여정 링크가 아니에요'); return false; }
   const owner=String(json.owner||"").replace(/[\u0000-\u001f<>]/g,"").trim().slice(0,20);
-  SHARED={doc,owner,hash:hashOf(m[2]),meta:{id:"S",ord:"받은 여정",name:owner?owner+"의 여정":"받은 여정",shared:true,data:doc,desc:(owner?owner+"님이 ":"")+"링크로 보낸 여정이에요. 지도와 일정을 보고, 마음에 들면 내 여정으로 가져와 직접 고칠 수 있어요."}};
+  SHARED={doc,owner,hash:hashOf(code||m[2]),code,media:mediaMap,meta:{id:"S",ord:"받은 여정",name:owner?owner+"의 여정":"받은 여정",shared:true,data:doc,desc:(owner?owner+"님이 ":"")+"링크로 보낸 여정이에요. 지도와 일정을 보고, 마음에 들면 내 여행으로 가져와 직접 고칠 수 있어요."}};
   variant="S"; plan=loadPlan("S"); history=[]; document.getElementById('undo').disabled=true; render();
   if(typeof loadMediaIndex==='function') loadMediaIndex().then(paintMedia);
-  if(dropped) statusHint(`${dropped}곳은 이 버전에 없는 장소라 빠졌어요`);
+  if(dropped) statusHint(`${dropped}곳은 이 버전에 없는 장소라 빠졌어요`); else statusHint('');
   return true;
 }
 function importShared(){
   if(!SHARED) return; const doc=structuredClone(plan); delete doc.createdAt; delete doc.updatedAt; delete doc.templateId;
   doc.importedFrom={title:String(doc.title||SHARED.meta.name).slice(0,80),owner:SHARED.owner||undefined,at:Date.now(),hash:SHARED.hash};
-  const sh=SHARED; SHARED=null; applyImport(normalizeDoc(doc)); try{ window.history.replaceState(null,'',location.pathname+location.search); }catch(e){} ioMsg(`${sh.owner?sh.owner+'님의 여정을 ':''}내 여행으로 가져왔어요`);
+  const sh=SHARED; SHARED=null;
+  // 사진도 함께: 가져오기 전 장소 id를 기억해 두고, id가 새로 발급된 뒤 서버에서 내려받아 기기에 저장
+  const before=[]; doc.days.forEach((d,di)=>d.items.forEach((it,si)=>{ if(sh.media&&sh.media[it.id]) before.push({di,si,list:sh.media[it.id]}); }));
+  applyImport(normalizeDoc(doc)); try{ window.history.replaceState(null,'',location.pathname+location.search); }catch(e){} ioMsg(`${sh.owner?sh.owner+'님의 여정을 ':''}내 여행으로 가져왔어요`);
+  if(before.length){ const tripId=TRIPS.cur; (async()=>{ let n=0, total=before.reduce((a,b)=>a+b.list.length,0); toast(`사진 ${total}장을 가져오는 중…`,4000);
+    for(const b of before){ const d=doc.days[b.di], it=d&&d.items[b.si]; if(!it) continue; for(const mrec of b.list){ try{ const [f,t]=await Promise.all([fetch(mrec.full),fetch(mrec.url)]); if(!f.ok) continue; const blob=await f.blob(); const thumb=t.ok?await t.blob():null; await media.put({id:newId(),tripId,dayId:d.id,stopId:it.id,kind:'image',mime:blob.type||'image/jpeg',size:blob.size,name:'',createdAt:Date.now(),blob,thumb}); n++; }catch(e){} } }
+    toast(`사진 ${n}장을 가져왔어요`); if(TRIPS.cur===tripId&&variant==='U'){ loadMediaIndex().then(paintMedia); } })(); }
 }
 document.getElementById('sharedBar').addEventListener('click',e=>{
   const o=e.target.closest('#sharedOpen'); if(o){ const id=TRIPS.ids.find(x=>{ try{ const p=JSON.parse(localStorage.getItem('tokki-trip:'+x)||'null'); return p&&p.importedFrom&&SHARED&&p.importedFrom.hash===SHARED.hash; }catch(e){ return false; } }); if(id) openTripId(id); else switchPlan('U'); return; }
@@ -2002,7 +2042,7 @@ async function scanOrphans(){ const el=document.getElementById('orphanLine'); if
   const mb=orphans.reduce((a,r)=>a+(r.size||0),0)/1048576;
   el.innerHTML=`장소가 사라져 안 보이는 사진·영상 ${orphans.length}개(${mb<0.1?'0.1MB 미만':mb.toFixed(1)+'MB'}) <button class="linkbtn" type="button" id="orphanDel">지우기</button>`; el.hidden=false; }
 document.getElementById('orphanLine').addEventListener('click',async e=>{ const b=e.target.closest('#orphanDel'); if(!b) return; if(!b.dataset.arm){ b.dataset.arm='1'; b.classList.add('warn'); b.textContent='정말 지우기'; return; } let n=0; for(const id of ORPHANS){ try{ await media.del(id); n++; }catch(e){} } toast(`${n}개를 지웠어요`); ORPHANS=[]; scanOrphans(); });
-function paintMedia(){ const IDX=(typeof MEDIA_IDX==='object'&&MEDIA_IDX)||{}; const ro=!(currentMeta()&&currentMeta().custom); document.querySelectorAll('.media[data-stop]').forEach(el=>{ const list=IDX[el.dataset.stop]||[]; if(ro){ el.innerHTML=''; return; } el.innerHTML=list.map(m=>`<button class="th ${m.kind==='video'?'v':''} ${m.url?'':'noimg'}" type="button" data-mid="${esc(m.id)}" aria-label="${m.kind==='video'?'영상':'사진'} 보기">${m.url?`<img src="${m.url}" alt="">`:(m.kind==='video'?'🎞':'🖼')}</button>`).join('')+`<button class="madd" type="button" aria-label="사진·영상 담기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>${list.length?'더 담기':'사진·영상 담기'}</button>`; }); }
+function paintMedia(){ const IDX=(typeof MEDIA_IDX==='object'&&MEDIA_IDX)||{}; const ro=!(currentMeta()&&currentMeta().custom); document.querySelectorAll('.media[data-stop]').forEach(el=>{ const list=IDX[el.dataset.stop]||[]; if(ro){ const sl=(variant==='S'&&SHARED&&SHARED.media&&SHARED.media[el.dataset.stop])||[]; el.innerHTML=sl.map(m=>`<button class="th" type="button" data-mid="${esc(m.id)}" aria-label="사진 보기"><img src="${esc(m.url)}" alt="" loading="lazy" onerror="this.parentNode.classList.add('noimg');this.remove()"></button>`).join(''); return; } el.innerHTML=list.map(m=>`<button class="th ${m.kind==='video'?'v':''} ${m.url?'':'noimg'}" type="button" data-mid="${esc(m.id)}" aria-label="${m.kind==='video'?'영상':'사진'} 보기">${m.url?`<img src="${m.url}" alt="">`:(m.kind==='video'?'🎞':'🖼')}</button>`).join('')+`<button class="madd" type="button" aria-label="사진·영상 담기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>${list.length?'더 담기':'사진·영상 담기'}</button>`; }); }
 function toast(t,ms){ const el=document.getElementById('toast'); el.textContent=t; el.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>{ el.hidden=true; },ms||3500); }
 async function shrinkImage(file,maxEdge,quality){
   let bmp=null; try{ bmp=await createImageBitmap(file,{imageOrientation:'from-image'}); }catch(e){ try{ bmp=await createImageBitmap(file); }catch(e2){ bmp=null; } }
@@ -2044,6 +2084,7 @@ document.getElementById('days').addEventListener('click',e=>{
 });
 const mediaview=document.getElementById('mediaview'); let mvCur=null, mvURL=null;
 async function openMedia(id,stopId){
+  if(variant==='S'&&SHARED&&SHARED.media){ const m=(SHARED.media[stopId]||[]).find(x=>x.id===id); if(!m) return; mvCur=null; const pos=stopById(stopId); document.getElementById('mvTitle').textContent=`${pos?pos.it.n:''} · ${SHARED.owner?SHARED.owner+'님의 사진':'받은 사진'}`; const body=document.getElementById('mvBody'); body.innerHTML=''; const im=document.createElement('img'); im.src=m.full; im.alt=''; body.appendChild(im); document.getElementById('mvDelConfirm').hidden=true; document.getElementById('mvDel').hidden=true; mediaview.hidden=false; document.body.style.overflow='hidden'; return; }
   let rec=null; try{ rec=await media.get(id); }catch(e){} if(!rec){ toast('파일을 찾지 못했어요'); return; }
   mvCur={id,stopId}; if(mvURL){ URL.revokeObjectURL(mvURL); mvURL=null; } mvURL=URL.createObjectURL(rec.blob);
   const pos=stopById(stopId); const when=new Date(rec.createdAt); document.getElementById('mvTitle').textContent=`${pos?pos.it.n:''} · ${when.getMonth()+1}/${when.getDate()} ${String(when.getHours()).padStart(2,'0')}:${String(when.getMinutes()).padStart(2,'0')}`;

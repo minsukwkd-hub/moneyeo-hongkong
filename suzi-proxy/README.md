@@ -36,3 +36,24 @@ API 키를 HTML에 넣으면 받는 사람 모두에게 키가 노출되므로, 
 - 서버 비용 0원(Cloudflare 무료 한도), API 비용은 사용량만큼 Anthropic에 과금.
 - 토큰이 유출되면 다른 사람이 내 키로 호출할 수 있으니, 토큰을 바꾸거나(Secret 수정) Worker를 끄면 즉시 차단됩니다.
 - `ALLOWED_MODELS` 변수로 허용 모델을 제한할 수 있습니다(기본: opus-5-5, sonnet-5-5, haiku-5-5).
+
+
+## 공유 서버 (2026-10-16, M4)
+같은 Worker가 여정 공유 코드와 사진을 보관한다.
+
+| 경로 | 역할 | 저장소 |
+|---|---|---|
+| `POST /share` `{s, ph?, owner?}` | 짧은 코드 발급(8자) | KV `SHARE`, 90일 만료 |
+| `GET /s/<code>` | 코드로 페이로드 읽기 | KV |
+| `PUT /p/<code>/<id>` (image/jpeg·png·webp, 3MB 이하, 코드당 60개) | 공유 사진 올리기 | R2 `PHOTOS` |
+| `GET /p/<code>/<id>` | 사진 내려받기(1년 캐시) | R2, 수명주기 90일 |
+| `GET /` | 기능 안내 `{share, photos, ttlDays}` | - |
+
+쓰기(POST/PUT)는 `ALLOWED_ORIGIN`에서만, 읽기(GET)는 누구나(링크를 받은 사람). IP당 제한: 일반 30회/분, 사진 올리기 120회/분.
+
+### R2 켜기 (사진 공유)
+R2는 계정에서 한 번 활성화해야 한다(대시보드 → R2 → 결제 수단 등록, 무료 한도 10GB/월).
+1. `npx wrangler r2 bucket create tokki-photos`
+2. `npx wrangler r2 bucket lifecycle add tokki-photos --expire-days 90`
+3. `wrangler.toml`의 `[[r2_buckets]]` 세 줄 주석 해제 → `npx wrangler deploy`
+Worker는 바인딩이 없으면 `photos:false`를 돌려주고 페이지는 "사진 포함" 선택지를 숨긴다.
