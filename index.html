@@ -741,6 +741,14 @@ section{padding-block:26px 4px;scroll-margin-top:60px;display:grid;gap:14px}
 .map.route-map{height:230px}
 .map.ov{height:280px}
 .map .fail{padding:16px;color:var(--muted);font-size:13px}
+/* 배경 타일(CARTO)·핀 개선(M3c): 타일이 한 장이라도 오면 해안선·바다 라벨을 숨긴다. 오프라인이면 해안선으로 돌아간다 */
+.tiles .land{display:none} .tiles .lbl.sea{display:none} .leaflet-container.tiles{background:#e9ecef}
+.tiles .lbl{text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 4px #fff}
+.locbtn{width:36px;height:36px;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--fg);font-size:18px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(19,35,31,.18);display:grid;place-items:center;margin:0 10px 10px 0}
+.locbtn.busy{opacity:.5}
+.medot{fill:#1d6fe8;fill-opacity:1;stroke:#fff;stroke-width:2.5} .mering{fill:#1d6fe8;fill-opacity:.12;stroke:#1d6fe8;stroke-width:1}
+.catalog .grp{margin:6px 0 0;font-weight:700}
+.pl.wd{border-style:dashed}
 /* titles share the SUZI display face */
 .dayhead h2,.key h3,.tip h3{font-family:var(--display);font-weight:400;letter-spacing:.01em}
 .dayhead h2{font-size:22px}
@@ -1001,7 +1009,7 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
 </section>
 
 <footer>
-  <div>지도 해안선: © OpenStreetMap 기여자(ODbL), GSHHG, Natural Earth. 최근 매립지 일부는 빠져 있을 수 있어요. 정확한 길은 장소별 구글 지도 링크를 이용하세요.</div>
+  <div>지도: © OpenStreetMap 기여자(ODbL). 오프라인일 땐 해안선만 보여요(GSHHG, Natural Earth). 장소 사전: Wikidata(CC0). 정확한 길은 장소별 구글 지도 링크를 이용하세요.</div>
   <div id="fn">* 토끼 도우미는 Claude 기반이에요. 실시간 웹 검색은 하지 않아서 가격, 항공 스케줄, 영업시간은 최신이 아닐 수 있어요. 예약 전에 공식 사이트에서 꼭 확인하세요. 토끼가 바꾼 일정은 지금 이 기기의 브라우저에만 저장돼요.</div>
 </footer>
 </div>
@@ -1627,13 +1635,19 @@ function drawMap(el, spec, big){
   const interactive = big || !TOUCH;
   const m = L.map(el, {zoomControl:!spec.static, attributionControl:false, dragging:spec.static?false:interactive,
     touchZoom:!spec.static, doubleClickZoom:!spec.static, boxZoom:false, keyboard:!spec.static,
-    scrollWheelZoom: big, tap:false, zoomSnap:.25, minZoom:spec.asia?3:9, maxZoom:17});
+    scrollWheelZoom: big, tap:false, zoomSnap:.25, minZoom:spec.asia?3:9, maxZoom:18});
   const ll=(spec.pins||[]).map(p=>[p.lat,p.lng]);
   if(spec.fit) m.fitBounds(spec.fit,{padding:[16,16]});
   else if(ll.length>1) m.fitBounds(ll,{padding:[36,36],maxZoom:16});
   else if(ll.length===1) m.setView(ll[0],15);
   else m.setView([22.28,114.0],10);
   L.geoJSON(spec.asia?LANDGEO.asia:LANDGEO.hk, {style:{className:"land"}, interactive:false, smoothFactor:.6}).addTo(m);
+  // 배경 타일(OpenStreetMap 표준 타일, 키 없음·출처 표기·소규모 개인 이용). 타일이 오면 해안선을 숨기고, 못 받으면 해안선 지도로 남는다(해외 데이터 끊김 대비)
+  if(!spec.asia&&navigator.onLine!==false){
+    const tl=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,crossOrigin:true,className:'basetiles',keepBuffer:1});
+    let ok=0, bad=0; tl.on('tileload',()=>{ ok++; el.classList.add('tiles'); }); tl.on('tileerror',()=>{ bad++; if(!ok&&bad>=2) el.classList.remove('tiles'); });
+    tl.addTo(m);
+  }
   (spec.lines||[]).forEach(l=>L.polyline(l,{className:"route",interactive:false}).addTo(m));
   if(!spec.asia){
     PLACES.forEach(pl=>L.marker([pl.lat,pl.lng],{interactive:false,keyboard:false,icon:L.divIcon({className:"lblw",html:`<span class="lbl ${pl.c}">${esc(pl.t)}</span>`,iconSize:[0,0]})}).addTo(m));
@@ -1641,12 +1655,26 @@ function drawMap(el, spec, big){
     m.on("zoomend",zc);
   }
   (spec.extra||[]).forEach(x=>L.marker([x.lat,x.lng],{interactive:false,keyboard:false,icon:L.divIcon({className:"lblw",html:x.html,iconSize:[0,0]})}).addTo(m));
+  // 같은 자리에 겹치는 핀(같은 역을 두 번 들르는 날 등)은 둘레로 살짝 비켜 그린다
+  const placed=[]; const nudge=p=>{ const base=m.latLngToLayerPoint([p.lat,p.lng]); let pt=base, k=0; while(placed.some(q=>q.distanceTo(pt)<16)&&k<8){ const a=-Math.PI/2+k*Math.PI/4; pt=base.add([Math.cos(a)*18,Math.sin(a)*18]); k++; } placed.push(pt); return k?m.layerPointToLatLng(pt):[p.lat,p.lng]; };
   (spec.pins||[]).forEach(p=>{
-    const mk=L.marker([p.lat,p.lng],{icon:pinIcon(p),title:p.n,zIndexOffset:p.key?500:(p.hotel?300:0)}).addTo(m);
+    const mk=L.marker(nudge(p),{icon:pinIcon(p),title:p.n,zIndexOffset:p.key?500:(p.hotel?300:0)}).addTo(m);
     mk.bindPopup(popupHtml(p),{maxWidth:240});
   });
+  if(!spec.asia&&!spec.static&&navigator.geolocation){
+    const Loc=L.Control.extend({onAdd(){ const b=L.DomUtil.create('button','locbtn'); b.type='button'; b.title='내 위치'; b.setAttribute('aria-label','내 위치 보기'); b.textContent='◎'; L.DomEvent.disableClickPropagation(b); L.DomEvent.on(b,'click',()=>locateMe(m,b)); return b; }});
+    new Loc({position:'bottomright'}).addTo(m);
+  }
   if(!spec.asia){ el.classList.toggle("z-lo", m.getZoom()<12.5); el.classList.toggle("z-hi", m.getZoom()>=12.5); }
   return m;
+}
+// 내 위치(여행 중): 파란 점과 정확도 원. HTTPS에서만 동작
+function locateMe(m,btn){
+  btn.classList.add('busy');
+  navigator.geolocation.getCurrentPosition(pos=>{ btn.classList.remove('busy'); const ll=[pos.coords.latitude,pos.coords.longitude], acc=Math.min(pos.coords.accuracy||30,500);
+    if(m._me){ m._me.setLatLng(ll); m._meR.setLatLng(ll).setRadius(acc); } else { m._meR=L.circle(ll,{radius:acc,className:'mering',interactive:false}).addTo(m); m._me=L.circleMarker(ll,{radius:7,className:'medot',interactive:false}).addTo(m); }
+    if(!inHK(ll[0],ll[1])) toast('지금은 홍콩·마카오 밖이에요'); m.setView(ll,Math.max(m.getZoom(),15));
+  },err=>{ btn.classList.remove('busy'); toast(err&&err.code===1?'위치 권한이 꺼져 있어요. 브라우저 설정에서 허용해 주세요':'위치를 가져오지 못했어요'); },{enableHighAccuracy:true,timeout:8000,maximumAge:30000});
 }
 function mount(id, el, spec){
   if(LIVE[id]){ LIVE[id].remove(); delete LIVE[id]; }
@@ -1731,7 +1759,8 @@ function render(){
     const hk=pins.length&&pins[0].lng>113.8;
     if(hk) pins.push({n:L0.name,q:L0.q,lat:L0.lat,lng:L0.lng,hotel:true,t:nights||"숙소",why:L0.isDefault?"마카오 페리터미널(신덕센터) 바로 옆이에요.":`${L0.area} 숙소`});
     const mapEl=sec.querySelector('.map');
-    if(pins.length) mount('d'+(di+1),mapEl,{pins}); else sec.querySelector('.mapbox').hidden=true;
+    const seq=pins.filter(p=>!p.hotel).map(p=>[p.lat,p.lng]);
+    if(pins.length) mount('d'+(di+1),mapEl,{pins,lines:seq.length>1?[seq]:[]}); else sec.querySelector('.mapbox').hidden=true;
   });
   // overview
   const ov=[{n:"홍콩국제공항",q:"Hong Kong International Airport",lat:22.3080,lng:113.9185,i:"✈",why:"공항철도로 홍콩역까지 약 24분"},{n:L0.name,q:L0.q,lat:L0.lat,lng:L0.lng,hotel:true,t:nights||"숙소",why:L0.isDefault?"마카오 페리터미널 바로 옆":`${L0.area} 숙소`}];
@@ -2070,20 +2099,35 @@ function openAdd(day){
   addSel=null; addArea="전체"; addsheet.hidden=false; scrim.hidden=false; fab.hidden=true;
   const ds=document.getElementById('addDay'); ds.innerHTML=plan.days.map((d,i)=>`<option value="${i+1}">Day ${i+1}</option>`).join(''); ds.value=String(day||1);
   document.getElementById('addKey').checked=false; document.getElementById('search').value='';
-  renderCatalog(); geoReset(); updateAddForm(); setTimeout(()=>document.getElementById('search').focus(),50);
+  renderCatalog(); geoReset(); updateAddForm(); loadWD(); setTimeout(()=>document.getElementById('search').focus(),50);
 }
 function closeAdd(){ addsheet.hidden=true; scrim.hidden=true; fab.hidden=false; }
+// 장소 사전(data/places-hk.json): Wikidata에서 받은 홍콩·마카오 228곳의 한국어·영어·한자 이름과 좌표. 처음 검색할 때 한 번 내려받고 기기 안에서 찾는다(키·서버 없음).
+let WD=null, wdLoading=null;
+function loadWD(){ if(WD) return Promise.resolve(WD); if(!wdLoading){ wdLoading=fetch('data/places-hk.json').then(r=>{ if(!r.ok) throw new Error('http '+r.status); return r.json(); }).then(j=>{ WD=(j.items||[]).map((a,i)=>({i,ko:a[0],en:a[1]||'',zh:a[2]||'',lat:+a[3],lng:+a[4],kind:KIND[a[5]]?a[5]:'명소'})); return WD; }).catch(e=>{ wdLoading=null; return null; }); } return wdLoading; }
+function nrm(x){ return String(x||'').toLowerCase().replace(/[\s·\-–—'’.,()（）]/g,''); }
+function wdMatches(qv){
+  if(!qv) return []; const ascii=/^[\x20-\x7e]+$/.test(qv); if(ascii?qv.length<3:qv.length<2) return [];
+  if(!WD){ loadWD().then(w=>{ if(w&&!addsheet.hidden) renderCatalog(); }); return []; }
+  const nq=nrm(qv); const sc=p=>{ const k=nrm(p.ko), e=nrm(p.en), z=nrm(p.zh); if(k.startsWith(nq)||e.startsWith(nq)) return 2; if(k.includes(nq)||e.includes(nq)||(z&&z.includes(nq))) return 1; return 0; };
+  return WD.map(p=>({...p,s:sc(p)})).filter(p=>p.s).sort((a,b)=>b.s-a.s||((a.kind==='교통')-(b.kind==='교통'))||a.ko.localeCompare(b.ko)).slice(0,8);
+}
 function renderCatalog(){
   const qv=document.getElementById('search').value.trim().toLowerCase();
   const list=allPlaces().filter(p=>(addArea==="전체"||p.area===addArea)&&(!qv||p.n.toLowerCase().includes(qv)||p.q.toLowerCase().includes(qv)));
   document.getElementById('areas').innerHTML=["전체",...AREAS].map(a=>`<button class="chip${a===addArea?' on':''}" type="button" data-a="${esc(a)}">${esc(a)}</button>`).join('');
-  document.getElementById('catalog').innerHTML=list.length?list.map(p=>`<button class="pl${addSel===p?' on':''}" type="button" data-q="${esc(p.q)}" aria-pressed="${addSel===p}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)}</span><span class="w">${esc(p.why)}</span></button>`).join(''):'<p class="hint">목록에는 없어요. 위 "지도에서 찾기"를 누르거나(영어·한자 이름이 잘 찾혀요) 토끼에게 "○○ 넣어줘"라고 해 보세요.</p>';
+  const have=new Set(list.map(p=>nrm(p.n))); const wd=wdMatches(qv).filter(p=>!have.has(nrm(p.ko)));
+  document.getElementById('catalog').innerHTML=(list.length?list.map(p=>`<button class="pl${addSel===p?' on':''}" type="button" data-q="${esc(p.q)}" aria-pressed="${addSel===p}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)}</span><span class="w">${esc(p.why)}</span></button>`).join(''):(wd.length?'':'<p class="hint">목록에는 없어요. 위 "지도에서 찾기"를 누르거나(영어·한자 이름이 잘 찾혀요) 토끼에게 "○○ 넣어줘"라고 해 보세요.</p>'))
+    +(wd.length?`<p class="hint grp">장소 사전에서 찾은 곳 · 누르면 선택돼요</p>`+wd.map(p=>`<button class="pl wd" type="button" data-wd="${p.i}"><b>${esc(p.ko)}</b><span class="ar">${esc(areaOf(p))} · ${esc(p.kind)}</span><span class="w">${esc([p.en,p.zh].filter(Boolean).join(' · '))}</span></button>`).join(''):'');
 }
 function updateAddForm(){ document.getElementById('selName').textContent=addSel?'선택: '+addSel.n:'아래에서 장소를 고르세요'; document.getElementById('addGo').disabled=!addSel; }
 document.getElementById('addClose').onclick=closeAdd;
 document.getElementById('search').addEventListener('input',()=>{ renderCatalog(); geoReset(); });
 document.getElementById('areas').onclick=e=>{ const b=e.target.closest('.chip'); if(b){ addArea=b.dataset.a; renderCatalog(); } };
-document.getElementById('catalog').onclick=e=>{ const b=e.target.closest('.pl'); if(!b) return; addSel=allPlaces().find(p=>p.q===b.dataset.q)||null; renderCatalog(); updateAddForm(); };
+function pickPlace(place){ const k=CUSTOM_PLACES.findIndex(x=>x.q===place.q); if(k>=0) CUSTOM_PLACES[k]=place; else CUSTOM_PLACES.unshift(place); saveCustomPlaces(); addSel=CUSTOM_PLACES.find(x=>x.q===place.q); renderCatalog(); updateAddForm(); }
+document.getElementById('catalog').onclick=e=>{
+  const w=e.target.closest('.pl[data-wd]'); if(w){ const p=WD&&WD[+w.dataset.wd]; if(!p) return; pickPlace({n:p.ko,q:(p.en||p.ko)+(p.lng<113.75?' Macau':' Hong Kong'),lat:p.lat,lng:p.lng,why:'',note:'',area:areaOf(p),kind:p.kind,custom:true,src:'wd'}); document.getElementById('selName').textContent='선택: '+p.ko+' · 장소 사전'; return; }
+  const b=e.target.closest('.pl'); if(!b) return; addSel=allPlaces().find(p=>p.q===b.dataset.q)||null; renderCatalog(); updateAddForm(); };
 // 지도에서 찾기: OpenStreetMap Nominatim(키·서버 없음, 1초 1회 정책). 카탈로그에 없는 장소를 이름으로 찾아 좌표·종류까지 가져와 내 장소 목록(tokki-places-v1)에 넣는다.
 // 한국어 이름은 OSM에 name:ko가 있는 곳만 잡히므로 영어·한자 이름을 권한다. 홍콩·마카오 범위로 한정.
 const GEO_CACHE=new Map(); let geoBusy=false, geoLast=[];
@@ -2104,21 +2148,47 @@ function geoPlace(r){ const nd=r.namedetails||{}; const ascii=/^[\x20-\x7e]+$/; 
   const base=String(en||r.name||n).replace(/\s*,\s*$/,'').slice(0,80); const suf=mac?' Macau':' Hong Kong'; const q=/hong\s*kong|macau|macao|香港|澳門|澳门/i.test(base)?base:base+suf;
   const a=r.address||{}; const addr=[a.road, a.neighbourhood||a.suburb||a.quarter||a.village||a.town, a.city_district||a.district||a.county||a.state_district].filter(Boolean).map(x=>String(x).trim()).filter((x,i,arr)=>arr.indexOf(x)===i).join(' · ');
   return {n,q,lat,lng,why:'',note:'',area:areaOf({lat,lng}),kind:geoKindOf(r),custom:true,osm:(r.osm_type||'')+'/'+(r.osm_id||''),addr}; }
+function geoFilter(arr){ return (arr||[]).filter(r=>isFinite(+r.lat)&&isFinite(+r.lon)&&inHK(+r.lat,+r.lon)&&!/shenzhen|深圳|선전|zhuhai|珠海|주하이|guangdong|广东|광둥/i.test(r.display_name||'')); }
+function geoShow(list,hintText){ geoLast=list; document.getElementById('geoHint').textContent=hintText; const LST=document.getElementById('geoList'); LST.innerHTML=list.map((p,i)=>`<button class="pl" type="button" data-i="${i}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)} · ${esc(p.kind)}${p.approx?' · 위치 추정':''}</span><span class="w">${esc(p.addr||'')}</span></button>`).join(''); LST.hidden=!list.length; }
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+// 한국어로 못 찾으면 토끼(Claude, 빠른 모델)에게 영문·한자 공식 명칭을 물어 지도를 다시 찾는다. 토끼가 좌표까지 확신하면 "위치 추정"으로 하나 보여 준다.
+function apiHeaders(){ const h={"content-type":"application/json","anthropic-version":"2023-06-01"}; if(BACKEND&&BACKEND.kind==="key"){ h["x-api-key"]=CONN.key; h["anthropic-dangerous-direct-browser-access"]="true"; } else if(CONN.token) h["authorization"]="Bearer "+CONN.token; return h; }
+async function tokkiLookup(q){
+  const sys='너는 홍콩·마카오 여행 장소 이름 변환기야. 사용자가 준 한국어 장소명(식당·카페·호텔·명소·역 등)을 보고 JSON 한 줄만 출력해. 형식: {"en":"영문 공식 명칭","zh":"번체 한자 명칭(모르면 빈 문자열)","kind":"명소|식당|카페|호텔|전망|쇼핑|페리|교통 중 하나","lat":위도,"lng":경도,"sure":true|false}. 좌표는 소수 4자리까지 아는 만큼 정확히 적고 자신이 없으면 sure:false. 홍콩·마카오에 없거나 실존을 모르면 {"en":""}. 설명이나 코드블록 없이 JSON만.';
+  const body={model:"claude-haiku-5-5",max_tokens:1500,stream:true,system:sys,messages:[{role:"user",content:q}],output_config:{effort:"low"}};
+  const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),20000);
+  try{ const r=await apiRequest(body,apiHeaders(),ctl.signal,null); const text=(r.content||[]).filter(b=>b.type==="text").map(b=>b.text).join(""); const m=/\{[\s\S]*?\}/.exec(text); if(!m) return null; const j=JSON.parse(m[0]);
+    return {en:String(j.en||"").trim().slice(0,80),zh:String(j.zh||"").trim().slice(0,40),kind:String(j.kind||""),lat:+j.lat,lng:+j.lng,sure:!!j.sure}; }
+  finally{ clearTimeout(to); }
+}
+const GEO_MISS_KO='지도에서 못 찾았어요. 영어나 한자 이름으로 다시 찾아 보세요.', GEO_MISS='지도에서 못 찾았어요. 다른 표기로 해 보거나 "직접 넣기"로 좌표를 붙여 주세요.';
 document.getElementById('geoBtn').onclick=async ()=>{
   const q=document.getElementById('search').value.trim().slice(0,80); if(q.length<2||geoBusy) return; geoBusy=true;
-  const hint=document.getElementById('geoHint'), L=document.getElementById('geoList'); hint.textContent='지도에서 찾는 중…'; L.hidden=true; L.innerHTML='';
-  try{ const arr=(await geoSearch(q)).filter(r=>isFinite(+r.lat)&&isFinite(+r.lon)&&inHK(+r.lat,+r.lon)&&!/shenzhen|深圳|선전|zhuhai|珠海|주하이|guangdong|广东|광둥/i.test(r.display_name||'')); geoLast=arr.map(geoPlace);
-    if(!geoLast.length){ hint.textContent=/[가-힣]/.test(q)?'지도에서 못 찾았어요. 영어나 한자 이름으로 다시 찾아 보세요.':'지도에서 못 찾았어요. 다른 표기로 해 보거나 "직접 넣기"로 좌표를 붙여 주세요.'; return; }
-    hint.textContent=`${geoLast.length}곳 찾음 · 누르면 선택돼요`;
-    L.innerHTML=geoLast.map((p,i)=>`<button class="pl" type="button" data-i="${i}"><b>${esc(p.n)}</b><span class="ar">${esc(p.area)} · ${esc(p.kind)}</span><span class="w">${esc(p.addr||'')}</span></button>`).join(''); L.hidden=false;
-  }catch(e){ hint.textContent='지도 검색이 지금 안 돼요. 잠시 뒤 다시 하거나 "직접 넣기"로 좌표를 붙여 주세요.'; }
+  const hint=document.getElementById('geoHint'); geoShow([],'지도에서 찾는 중…');
+  try{
+    let list=geoFilter(await geoSearch(q)).map(geoPlace);
+    if(list.length){ geoShow(list,`${list.length}곳 찾음 · 누르면 선택돼요`); return; }
+    const ko=/[가-힣]/.test(q);
+    if(ko&&typeof BACKEND!=="undefined"&&BACKEND&&BACKEND.kind!=="artifact"){
+      hint.textContent='지도에 없어서 토끼에게 영어 이름을 묻는 중…';
+      const t=await tokkiLookup(q).catch(()=>null);
+      if(t&&t.en){
+        await wait(1100); let arr=geoFilter(await geoSearch(t.en));
+        if(!arr.length&&t.zh){ await wait(1100); arr=geoFilter(await geoSearch(t.zh)); }
+        list=arr.map(r=>{ const p=geoPlace(r); if(!(r.namedetails||{})['name:ko']){ p.addr=[p.n,p.addr].filter(Boolean).join(' · '); p.n=q.slice(0,60); } if(KIND[t.kind]&&p.kind==='명소') p.kind=t.kind; return p; });
+        if(!list.length&&t.sure&&inHK(t.lat,t.lng)){ list=[{n:q.slice(0,60),q:t.en+(t.lng<113.75?' Macau':' Hong Kong'),lat:+t.lat.toFixed(5),lng:+t.lng.toFixed(5),why:'',note:'',area:areaOf({lat:t.lat,lng:t.lng}),kind:KIND[t.kind]?t.kind:'명소',custom:true,approx:true,addr:`${t.en} · 토끼가 기억하는 위치라 구글 지도에서 확인해 주세요`}]; }
+        if(list.length){ geoShow(list,`토끼가 "${t.en}"(으)로 바꿔 찾았어요 · 누르면 선택돼요`); return; }
+        geoShow([],`토끼는 "${t.en}"라고 하는데 지도에서 못 찾았어요. 그 이름으로 다시 찾아 보거나 "직접 넣기"로 좌표를 붙여 주세요.`); return;
+      }
+    }
+    geoShow([],ko?GEO_MISS_KO:GEO_MISS);
+  }catch(e){ geoShow([],'지도 검색이 지금 안 돼요. 잠시 뒤 다시 하거나 "직접 넣기"로 좌표를 붙여 주세요.'); }
   finally{ geoBusy=false; }
 };
 document.getElementById('geoList').onclick=e=>{ const b=e.target.closest('.pl'); if(!b) return; const p=geoLast[+b.dataset.i]; if(!p) return;
-  const place={n:p.n,q:p.q,lat:p.lat,lng:p.lng,why:'',note:'',area:p.area,kind:p.kind,custom:true,osm:p.osm};
-  const k=CUSTOM_PLACES.findIndex(x=>x.q===place.q); if(k>=0) CUSTOM_PLACES[k]=place; else CUSTOM_PLACES.unshift(place); saveCustomPlaces();
-  addSel=CUSTOM_PLACES.find(x=>x.q===place.q); addArea="전체"; document.getElementById('search').value=''; geoReset(); renderCatalog(); updateAddForm();
-  document.getElementById('selName').textContent='선택: '+place.n+' · 지도에서 찾음'; document.getElementById('addsheet').querySelector('.sheet-in').scrollTop=0; };
+  const place={n:p.n,q:p.q,lat:p.lat,lng:p.lng,why:'',note:p.approx?'위치는 토끼 추정이라 구글 지도에서 확인해 주세요':'',area:p.area,kind:p.kind,custom:true,osm:p.osm||undefined,approx:p.approx||undefined};
+  addArea="전체"; document.getElementById('search').value=''; geoReset(); pickPlace(place);
+  document.getElementById('selName').textContent='선택: '+place.n+(place.approx?' · 토끼 추정 위치':' · 지도에서 찾음'); document.getElementById('addsheet').querySelector('.sheet-in').scrollTop=0; };
 // 목록에 없는 장소 직접 넣기
 document.getElementById('customToggle').onclick=()=>{ const f=document.getElementById('customForm'); f.hidden=!f.hidden; if(!f.hidden){ const sel=f.querySelector('#cpArea'); sel.innerHTML=Object.keys(LODGE_AREAS).map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join(''); setTimeout(()=>f.querySelector('#cpName').focus(),50); } };
 document.getElementById('customCancel').onclick=()=>{ document.getElementById('customForm').hidden=true; };
