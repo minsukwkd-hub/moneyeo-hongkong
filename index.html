@@ -1,5 +1,6 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>토끼의 여정</title>
+<meta property="og:title" content="토끼의 여정"><meta property="og:description" content="여정 링크를 열면 일정과 지도를 보고, 내 여정으로 가져와 직접 고칠 수 있어요."><meta name="description" content="휴대폰 우선 여행 일정 페이지 · 토끼의 여정">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
@@ -939,6 +940,7 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
   <h1>엄마랑 딸,<br><span>천천히</span> 홍콩</h1>
   <p>하루에 핵심 장소는 한 곳만. 나머지는 밥 먹고 쉬는 시간이에요. 아래에서 여정을 고르거나 "당신의 여정"에서 직접 꾸며 보세요. 궁금한 건 오른쪽 아래 토끼에게 물어보면 일정에 바로 반영돼요.</p>
   <div class="pickwrap"><div class="picker" id="picker" role="group" aria-label="여정 고르기"></div><p class="pickdesc" id="pickdesc"></p></div>
+  <div class="callout" id="sharedBar" hidden></div>
   <div class="status" id="status"></div>
   <p class="statushint" id="statusHint" hidden></p>
 </header>
@@ -969,6 +971,8 @@ footer{padding-block:20px;font-size:12px;color:var(--muted);display:grid;gap:6px
     <span id="resetConfirm" hidden><button class="ghost" id="resetYes" type="button" style="color:var(--pin)">네, 초기화</button> <button class="ghost" id="resetNo" type="button">취소</button></span>
     <button class="ghost" id="exportBtn" type="button">여정 내보내기</button>
     <button class="ghost" id="importBtn" type="button">여정 불러오기</button><input type="file" id="importFile" accept="application/json,.json" hidden>
+    <button class="ghost" id="shareBtn" type="button">여정 공유 링크</button>
+    <span id="shareConfirm" hidden><label class="hint"><input type="checkbox" id="shareFl" checked> 항공편·숙소 포함</label> <button class="ghost" id="shareGo" type="button" style="color:var(--accent);font-weight:700">링크 만들기</button> <button class="ghost" id="shareNo" type="button">취소</button></span>
     <span id="importConfirm" hidden><button class="ghost" id="importYes" type="button" style="color:var(--pin)">네, 당신의 여정을 덮어쓰기</button> <button class="ghost" id="importNo" type="button">취소</button></span>
     <span id="ioMsg" class="hint" hidden></span>
   </div>
@@ -1357,7 +1361,8 @@ const CATALOG=(()=>{
 // ---- state ----
 const VKEY="suzi-hk-variant";
 const storeKey=id=>"suzi-hk-plan-v2:"+id;
-const metaOf=id=>PLANS.find(p=>p.id===id);
+var SHARED=null; // 링크로 받은 여정 {doc, owner, hash, meta}. 보는 동안만 메모리에 있고 저장되지 않는다 (설계 2.9)
+const metaOf=id=>(id==="S"&&SHARED)?SHARED.meta:PLANS.find(p=>p.id===id);
 let variant=(()=>{ try{ const v=localStorage.getItem(VKEY); return metaOf(v)?v:"A"; }catch(e){ return "A"; } })();
 
 // ---- 데이터 모델 v3 (docs/설계.md 2장) ----
@@ -1401,14 +1406,14 @@ const repo={
     if(!p||!Array.isArray(p.days)) p=structuredClone(metaOf(id).data);
     return normalizeDoc(p);
   },
-  save(id,p){ p.updatedAt=Date.now(); try{ localStorage.setItem(TRIP_KEY(id), JSON.stringify(p)); }catch(e){} },
+  save(id,p){ if(id==="S") return; p.updatedAt=Date.now(); try{ localStorage.setItem(TRIP_KEY(id), JSON.stringify(p)); }catch(e){} },
   fresh(id){ return normalizeDoc(structuredClone(metaOf(id).data)); }
 };
 function loadPlan(id){ return repo.load(id); }
 let plan=loadPlan(variant), history=[];
 function currentMeta(){ return metaOf(variant); }
 function currentDefault(){ return currentMeta().data; }
-function save(){ repo.save(variant,plan); try{ localStorage.setItem(VKEY, variant); }catch(e){} if(typeof SETTINGS!=="undefined"){ SETTINGS.last={type:"trip",id:variant}; saveSettings(); } }
+function save(){ if(variant==="S") return; repo.save(variant,plan); try{ localStorage.setItem(VKEY, variant); }catch(e){} if(typeof SETTINGS!=="undefined"){ SETTINGS.last={type:"trip",id:variant}; saveSettings(); } }
 function stopById(id){ for(const d of plan.days){ const k=d.items.findIndex(x=>x.id===id); if(k>=0) return {d,k,it:d.items[k]}; } return null; }
 function daySummary(d){ return d.items.map(it=>({id:it.id,t:it.t,n:it.n})); }
 // ---- 여행 기본정보(M2a): 날짜·숙소 ----
@@ -1510,7 +1515,7 @@ function reorderStops(d,ids){
   const cur=d.items.map(x=>x.id); if(ids.length!==cur.length||new Set(ids).size!==ids.length||!ids.every(id=>cur.includes(id))) throw new Error("stop_ids는 그날의 장소 id 전체를 한 번씩, 원하는 순서로 담아야 해요");
   const times=d.items.map(x=>x.t), byId=new Map(d.items.map(x=>[x.id,x])); d.items=ids.map(id=>byId.get(id)); d.items.forEach((x,i)=>{ x.t=times[i]; });
 }
-function switchPlan(id){ if(!metaOf(id)) return; const changed=id!==variant; if(changed){ variant=id; plan=loadPlan(id); history=[]; document.getElementById('undo').disabled=true; } save(); render(); if(changed&&typeof loadMediaIndex==='function') loadMediaIndex().then(paintMedia); }
+function switchPlan(id){ if(!metaOf(id)) return; const changed=id!==variant; if(changed){ if(variant==="S") SHARED=null; variant=id; plan=loadPlan(id); history=[]; document.getElementById('undo').disabled=true; } save(); render(); if(changed&&typeof loadMediaIndex==='function') loadMediaIndex().then(paintMedia); }
 function sortDay(d){ d.items.sort((a,b)=>String(a.t).localeCompare(String(b.t))); }
 function isMacauPt(p){ return isFinite(p.lng)&&p.lng<113.75; }
 function snapshot(){ history.push(JSON.stringify(plan)); if(history.length>15) history.shift(); document.getElementById('undo').disabled=false; }
@@ -1597,23 +1602,28 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!bigwrap.hidden) c
 document.addEventListener("click",e=>{ const b=e.target.closest(".expand"); if(b) openBig(b.dataset.big,b.dataset.title||"홍콩·마카오 전체 지도"); });
 // ---- render ----
 function render(){
-  const P=currentMeta(), custom=!!P.custom;
+  const P=currentMeta(), custom=!!P.custom, shared=!!P.shared, live=custom||shared; // live: 데이터에서 핵심 장소·소제목·마카오 날을 계산(직접 꾸미기·받은 여정)
   const t=plan.trip||{};
   let macauDay=t.macau||"미정";
-  if(custom){ const mi=plan.days.findIndex(d=>d.items.some(isMacauPt)); macauDay = mi>=0 ? "Day "+(mi+1) : "미정"; }
+  if(live){ const mi=plan.days.findIndex(d=>d.items.some(isMacauPt)); macauDay = mi>=0 ? "Day "+(mi+1) : "미정"; }
+  const who=document.getElementById('who'); if(shared){ who.textContent=SHARED&&SHARED.owner?`${SHARED.owner}의 여정`:'받은 여정'; who.hidden=false; } else if(typeof SETTINGS==="object"&&SETTINGS&&SETTINGS.profile){ const n=travelerName(); who.textContent=n?`${n}의 여정`:''; who.hidden=!n; }
+  const sb=document.getElementById('sharedBar'); sb.hidden=!shared;
+  if(shared){ const U=loadPlan('U'), already=!!(U.importedFrom&&SHARED&&U.importedFrom.hash===SHARED.hash);
+    sb.innerHTML=`<b>${esc(SHARED&&SHARED.owner?SHARED.owner+'님이 보낸 여정':'링크로 받은 여정')}</b> 보기만 할 수 있어요. 토끼에게 바꿔 달라고 해도 이 화면에서만 바뀌고 저장되지 않아요. `
+      +(already?`<button class="linkbtn" type="button" id="sharedOpen">이미 가져왔어요 · 당신의 여정 열기 →</button> <button class="linkbtn" type="button" id="sharedImport">다시 가져오기</button>`:`<button class="linkbtn" type="button" id="sharedImport">내 여정으로 가져오기 →</button>`); }
   const fl=t.flights||{}, L0=lodgingOf(), nights=plan.days.length>1?`${plan.days.length-1}박`:"";
   const st=[["여행 날짜",tripDatesLabel()],["숙소",L0.isDefault?`셩완 · ${nights||'3박'} (임시)`:`${L0.name} · ${L0.area}${nights?' · '+nights:''}`],["항공편",[fl.in&&fl.in.code,fl.out&&fl.out.code].filter(Boolean).join(" / ")||"미정"],["마카오 가는 날",macauDay]];
   document.getElementById('status').innerHTML=st.map(([k,v])=>`<div class="stat ${/미정|임시/.test(v)?'todo':''}${custom?' edit':''}"${custom?' role="button" tabindex="0" title="눌러서 여행 정보 수정"':''}><div class="k">${esc(k)}${custom?' <span aria-hidden="true">✎</span>':''}</div><div class="v">${esc(v)}</div></div>`).join('');
   document.getElementById('picker').innerHTML=PLANS.map(p=>`<button type="button" class="pick${p.id===variant?' on':''}" data-id="${p.id}" aria-pressed="${p.id===variant}"><span class="o">${esc(p.ord)}</span><span class="n">${esc(p.name)}</span></button>`).join('');
-  document.getElementById('pickdesc').innerHTML=esc(P.desc)+(custom?'':' <button class="linkbtn" type="button" id="copyToMine">이 여정을 바탕으로 직접 꾸미기 →</button>');
-  const isMac=d=>d.macau||(custom&&d.items.some(isMacauPt));
+  document.getElementById('pickdesc').innerHTML=esc(P.desc)+(live?'':' <button class="linkbtn" type="button" id="copyToMine">이 여정을 바탕으로 직접 꾸미기 →</button>');
+  const isMac=d=>d.macau||(live&&d.items.some(isMacauPt));
   document.getElementById('tabs').innerHTML=`<a href="#overview">전체 지도</a>`+plan.days.map((d,i)=>`<a href="#d${i+1}">Day ${i+1}${isMac(d)?' 마카오':''}</a>`).join('')+`<a href="#tips">준비 팁</a>`;
   const host=document.getElementById('days'); host.innerHTML='';
   plan.days.forEach((d,di)=>{
     const sec=document.createElement('section'); sec.id='d'+(di+1);
     const keyIt=d.items.find(x=>x.key&&!x.hotel);
-    const keyCard=custom?(keyIt?{name:keyIt.n,why:keyIt.why}:null):d.key;
-    const LD=dayLoad(d), warn=custom?loadWarning(d):''; const sub0=custom?`${LD.count}곳 · 약 ${fmtMin(LD.total)} · 오늘의 한 곳 ${keyIt?keyIt.n:'미정'}`:(d.sub||''); const dd=dayDate(di); const sub=dd?(dd+(sub0?' · '+sub0:'')):sub0;
+    const keyCard=live?(keyIt?{name:keyIt.n,why:keyIt.why}:null):d.key;
+    const LD=dayLoad(d), warn=custom?loadWarning(d):''; const sub0=live?`${LD.count}곳 · 약 ${fmtMin(LD.total)} · 오늘의 한 곳 ${keyIt?keyIt.n:'미정'}`:(d.sub||''); const dd=dayDate(di); const sub=dd?(dd+(sub0?' · '+sub0:'')):sub0;
     sec.innerHTML=`<div class="dayhead"><div class="daynum">${String(di+1).padStart(2,'0')}</div><h2>${esc(d.title)}</h2><div class="sub">${esc(sub)}</div></div>`
       +(custom?`<div class="dayact"><button class="ghost addbtn" type="button" data-day="${di+1}">＋ 장소 넣기</button><button class="ghost brbtn" type="button" data-day="${di+1}">♡ 챙김 메모</button>${d.items.some(x=>!x.hotel)?'':'<span class="hint">아직 비어 있어요. 장소를 골라 넣어 보세요.</span>'}</div>`:'')
       +(warn?`<div class="callout warn"><b>오늘은 좀 빡빡해요</b> ${esc(warn)}</div>`:'')
@@ -1661,7 +1671,7 @@ function render(){
       {lat:mid[0],lng:mid[1],html:`<svg style="position:absolute;transform:translate(6px,-34px);width:30px;height:30px;color:var(--fg)" aria-hidden="true"><use href="#rabbit"/></svg>`}]});
 })();
 
-render();
+const SHARE_BOOT=/^#[sj]=/.test(location.hash||''); if(!SHARE_BOOT) render();
 
 // ---- undo / reset ----
 document.getElementById('undo').onclick=()=>{ if(!history.length) return; plan=normalizeDoc(JSON.parse(history.pop())); save(); render(); document.getElementById('undo').disabled=!history.length; };
@@ -1706,7 +1716,7 @@ function validateDoc(p){
 let importPending=null;
 document.getElementById('exportBtn').onclick=()=>{ exportDoc(); };
 document.getElementById('importBtn').onclick=()=>{ document.getElementById('importFile').click(); };
-function applyImport(doc){ reissueIds(doc); repo.save('U', doc); importPending=null; document.getElementById('importConfirm').hidden=true; variant='U'; plan=repo.load('U'); history=[]; document.getElementById('undo').disabled=true; save(); render(); ioMsg('"당신의 여정"으로 불러왔어요'); const sec=document.getElementById('d1'); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'}); }
+function applyImport(doc){ reissueIds(doc); repo.save('U', doc); importPending=null; document.getElementById('importConfirm').hidden=true; variant='U'; plan=repo.load('U'); history=[]; document.getElementById('undo').disabled=true; save(); render(); if(typeof loadMediaIndex==='function') loadMediaIndex().then(paintMedia); ioMsg('"당신의 여정"으로 불러왔어요'); const sec=document.getElementById('d1'); if(sec) sec.scrollIntoView({behavior:'smooth',block:'start'}); }
 document.getElementById('importFile').onchange=async e=>{
   const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
   if(f.size>2*1024*1024){ ioMsg('파일이 너무 커요 (2MB 이하)'); return; }
@@ -1721,6 +1731,103 @@ document.getElementById('importFile').onchange=async e=>{
 document.getElementById('importYes').onclick=()=>{ if(importPending) applyImport(importPending); };
 document.getElementById('importNo').onclick=()=>{ importPending=null; document.getElementById('importConfirm').hidden=true; };
 
+// ---- 여정 공유 링크 (M3a, 설계 2.9): 슬림 포맷 → deflate-raw → base64url → #s=… · 받는 쪽은 읽기 전용으로 보고 "내 여정으로 가져오기" ----
+// 받는 쪽도 같은 CATALOG·템플릿을 내장하므로 알려진 장소는 [시간, q, (몇 번째), (플래그)]만 싣고, 직접 넣은 장소만 통째로 싣는다. 사진·메모·지출·id는 싣지 않는다.
+const SHARE_V=1, SHARE_MAX=1800;
+const SHARE_REF=(()=>{ const m=new Map(); const push=p=>{ if(!p||!isFinite(p.lat)) return; const k=p.q||p.n; const arr=m.get(k)||[]; if(!arr.some(e=>e.n===p.n&&e.why===(p.why||"")&&e.note===(p.note||""))) arr.push({n:p.n,q:k,lat:p.lat,lng:p.lng,why:p.why||"",note:p.note||"",hotel:!!p.hotel}); m.set(k,arr); };
+  [PLAN_A,PLAN_B,PLAN_C,PLAN_U].forEach(pl=>pl.days.forEach(d=>d.items.forEach(push))); EXTRA.forEach(push); return m; })();
+function shareRefOf(it){ const arr=SHARE_REF.get(it.q||it.n); if(!arr) return null; const i=arr.findIndex(e=>e.n===it.n&&e.why===(it.why||"")&&e.note===(it.note||"")&&e.hotel===!!it.hotel&&Math.abs(e.lat-it.lat)<1e-4&&Math.abs(e.lng-it.lng)<1e-4); return i<0?null:i; }
+function toSlim(p,opt){
+  opt=opt||{}; const t=p.trip||{}; const M=currentMeta(); const s={v:SHARE_V};
+  s.title=String(p.title||(M.shared?M.name:(M.ord+" · "+M.name))).slice(0,40);
+  const owner=travelerName(); if(owner) s.owner=owner;
+  const dt=t.dates||{}, d2={}; if(dt.start) d2.start=dt.start; if(dt.end) d2.end=dt.end; if(dt.label) d2.label=dt.label; if(Object.keys(d2).length) s.dates=d2;
+  if(t.party&&t.party.type) s.party={type:t.party.type};
+  if(t.macau) s.macau=t.macau;
+  if(opt.flights!==false){ const f=t.flights||{}, fi=f.in&&f.in.code, fo=f.out&&f.out.code; if(fi||fo) s.fl={in:fi||undefined,out:fo||undefined}; }
+  if(opt.lodging!==false&&Array.isArray(t.lodging)&&t.lodging[0]){ const L=t.lodging[0]; s.lo=[{name:L.name,area:L.area,q:L.q,lat:L.lat,lng:L.lng}]; }
+  s.days=p.days.map(d=>{ const o={title:d.title}; if(d.sub) o.sub=d.sub; if(d.macau) o.m=1;
+    o.s=d.items.map(it=>{ const f={}; if(it.key) f.k=1; if(it.dur) f.dur=it.dur; if(it.kind) f.kind=it.kind; if(it.origin==='me') f.o='m'; else if(it.origin==='suzi') f.o='s'; const nf=Object.keys(f).length;
+      const ri=shareRefOf(it);
+      if(ri!==null){ const a=[it.t||"",it.q||it.n]; if(ri||nf) a.push(ri); if(nf) a.push(f); return a; }
+      const full={t:it.t||"",n:it.n,q:it.q||it.n,lat:+(+it.lat).toFixed(5),lng:+(+it.lng).toFixed(5)}; if(it.why) full.why=it.why; if(it.note) full.note=it.note; if(it.hotel) full.h=1; Object.assign(full,f); return full; });
+    const b=(d.bridges||[]).map(br=>{ const k=br.after?d.items.findIndex(x=>x.id===br.after):-1; return [k>=0?k:null,br.text]; }); if(b.length) o.b=b;
+    return o; });
+  return s;
+}
+// 링크 내용은 신뢰하지 않는다: 여기서 모양만 맞추고, 길이·좌표·개수 제한은 validateDoc이 건다
+function fromSlim(s){
+  if(!s||typeof s!=="object"||s.v!==SHARE_V||!Array.isArray(s.days)) throw new Error("여정 링크가 아니에요");
+  const O=f=>({m:"me",s:"suzi"})[f]||"template";
+  const trip={dates:(s.dates&&typeof s.dates==="object")?s.dates:{},party:(s.party&&typeof s.party==="object")?s.party:{type:"모녀"},flights:{in:s.fl&&s.fl.in?{code:s.fl.in}:null,out:s.fl&&s.fl.out?{code:s.fl.out}:null},lodging:Array.isArray(s.lo)?s.lo:[],macau:s.macau};
+  let dropped=0;
+  const days=s.days.slice(0,30).map(d=>{ d=d&&typeof d==="object"?d:{}; const items=[];
+    (Array.isArray(d.s)?d.s:[]).slice(0,50).forEach(x=>{ let it=null;
+      if(Array.isArray(x)){ const arr=SHARE_REF.get(String(x[1])); const e=arr&&arr[Math.max(0,Math.round(+x[2])||0)]; if(!e){ dropped++; return; } const f=x[3]&&typeof x[3]==="object"?x[3]:{}; it={t:x[0],n:e.n,q:e.q,lat:e.lat,lng:e.lng,why:e.why,note:e.note||undefined,hotel:e.hotel||undefined,key:!!f.k,kind:f.kind,dur:f.dur,origin:O(f.o)}; }
+      else if(x&&typeof x==="object"){ it={t:x.t,n:x.n,q:x.q,lat:x.lat,lng:x.lng,why:x.why,note:x.note,hotel:x.h?true:undefined,key:!!x.k,kind:x.kind,dur:x.dur,origin:x.o?O(x.o):"me"}; }
+      if(it){ it.id=newId(); items.push(it); } });
+    const bridges=(Array.isArray(d.b)?d.b:[]).slice(0,30).map(b=>Array.isArray(b)?{after:(b[0]!=null&&items[Math.round(+b[0])])?items[Math.round(+b[0])].id:null,text:b[1]}:null).filter(Boolean);
+    return {title:d.title,sub:d.sub,macau:d.m?true:undefined,items,bridges}; });
+  return {doc:{title:s.title,trip,days},dropped};
+}
+const B64U={enc:u8=>{ let b=''; for(let i=0;i<u8.length;i+=0x2000) b+=String.fromCharCode.apply(null,u8.subarray(i,i+0x2000)); return btoa(b).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); },
+  dec:s=>{ s=String(s).replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; const b=atob(s); const u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }};
+async function deflateRaw(u8){ const cs=new CompressionStream('deflate-raw'); const w=cs.writable.getWriter(); w.write(u8); w.close(); return new Uint8Array(await new Response(cs.readable).arrayBuffer()); }
+async function inflateRaw(u8){ const ds=new DecompressionStream('deflate-raw'); const w=ds.writable.getWriter(); w.write(u8); w.close(); return new Uint8Array(await new Response(ds.readable).arrayBuffer()); }
+function hashOf(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h.toString(36); }
+// 압축 스트림이 없는 옛 브라우저(iOS 16.3 이하)는 #j=(압축 없음)로 만든다. 받는 쪽은 둘 다 읽는다.
+async function buildShareLink(opt){
+  const u8=new TextEncoder().encode(JSON.stringify(toSlim(plan,opt)));
+  let frag=null; if(typeof CompressionStream!=="undefined"){ try{ frag="s="+B64U.enc(await deflateRaw(u8)); }catch(e){ frag=null; } }
+  if(!frag) frag="j="+B64U.enc(u8);
+  return location.origin+location.pathname+location.search+"#"+frag;
+}
+let shareLinks=null; // {full, slim} 미리 만들어 두고, 버튼 탭 순간에는 바로 공유 시트를 연다(사용자 동작 안에서 호출해야 하는 브라우저 대비)
+async function prepareShare(){ shareLinks=null; try{ const [full,slim]=await Promise.all([buildShareLink({}),buildShareLink({flights:false,lodging:false})]); shareLinks={full,slim}; }catch(e){ shareLinks=null; } }
+async function sendShare(url){
+  const owner=travelerName(); const title=owner?`${owner}의 여정`:'토끼의 여정'; const text=`${title} · ${plan.title||currentMeta().name} · 링크를 열면 일정과 지도를 보고 내 여정으로 가져올 수 있어요`;
+  if(navigator.share){ try{ await navigator.share({title,text,url}); ioMsg('여정 링크를 보냈어요'); return; }catch(e){ if(e&&e.name==="AbortError") return; } }
+  try{ await navigator.clipboard.writeText(url); ioMsg('여정 링크를 복사했어요 · 카카오톡 등에 붙여 넣으세요'); return; }catch(e){}
+  window.prompt('이 링크를 복사해서 보내세요', url);
+}
+document.getElementById('shareBtn').onclick=()=>{ const c=document.getElementById('shareConfirm'); c.hidden=!c.hidden; if(!c.hidden) prepareShare(); };
+document.getElementById('shareNo').onclick=()=>{ document.getElementById('shareConfirm').hidden=true; };
+document.getElementById('shareGo').onclick=async ()=>{
+  const inc=document.getElementById('shareFl').checked; let url=shareLinks?(inc?shareLinks.full:shareLinks.slim):null;
+  if(!url){ try{ url=await buildShareLink(inc?{}:{flights:false,lodging:false}); }catch(e){ ioMsg('링크를 만들지 못했어요'); return; } }
+  document.getElementById('shareConfirm').hidden=true;
+  if(url.length>SHARE_MAX){ ioMsg(`여정이 커서 링크 대신 파일로 보내요 (${url.length}자)`); exportDoc(); return; }
+  sendShare(url);
+};
+// 링크로 열기: #s= / #j= 를 읽어 "받은 여정"(S)으로 보여 준다. 저장하지 않고, 가져오기를 눌러야 "당신의 여정"이 된다.
+async function openSharedFromHash(){
+  const m=/^#(s|j)=([A-Za-z0-9_-]{4,})$/.exec(location.hash||""); if(!m) return false;
+  let json=null;
+  try{ const u8=B64U.dec(m[2]); const raw=m[1]==='s'?await inflateRaw(u8):u8; json=JSON.parse(new TextDecoder().decode(raw)); }
+  catch(e){ statusHint(m[1]==='s'&&typeof DecompressionStream==="undefined"?'이 브라우저는 여정 링크를 열 수 없어요. iOS 16.4 이상 또는 최신 Chrome으로 열어 주세요':'여정 링크를 읽지 못했어요'); return false; }
+  let doc=null, dropped=0;
+  try{ const r=fromSlim(json); dropped=r.dropped; doc=validateDoc(r.doc); }catch(e){ statusHint(e.message||'여정 링크가 아니에요'); return false; }
+  const owner=String(json.owner||"").replace(/[\u0000-\u001f<>]/g,"").trim().slice(0,20);
+  SHARED={doc,owner,hash:hashOf(m[2]),meta:{id:"S",ord:"받은 여정",name:owner?owner+"의 여정":"받은 여정",shared:true,data:doc,desc:(owner?owner+"님이 ":"")+"링크로 보낸 여정이에요. 지도와 일정을 보고, 마음에 들면 내 여정으로 가져와 직접 고칠 수 있어요."}};
+  variant="S"; plan=loadPlan("S"); history=[]; document.getElementById('undo').disabled=true; render();
+  if(typeof loadMediaIndex==='function') loadMediaIndex().then(paintMedia);
+  if(dropped) statusHint(`${dropped}곳은 이 버전에 없는 장소라 빠졌어요`);
+  return true;
+}
+function importShared(){
+  if(!SHARED) return; const doc=structuredClone(plan); delete doc.createdAt; delete doc.updatedAt; delete doc.templateId;
+  doc.importedFrom={title:String(doc.title||SHARED.meta.name).slice(0,80),owner:SHARED.owner||undefined,at:Date.now(),hash:SHARED.hash};
+  const sh=SHARED; SHARED=null; applyImport(normalizeDoc(doc)); try{ window.history.replaceState(null,'',location.pathname+location.search); }catch(e){} ioMsg(`${sh.owner?sh.owner+'님의 여정을 ':''}"당신의 여정"으로 가져왔어요`);
+}
+document.getElementById('sharedBar').addEventListener('click',e=>{
+  const o=e.target.closest('#sharedOpen'); if(o){ switchPlan('U'); return; }
+  const b=e.target.closest('#sharedImport'); if(!b||!SHARED) return;
+  if(INAPP){ statusHint('앱 안에서는 저장이 분리돼요. 위 "브라우저로 열기"로 연 다음 가져와 주세요'); return; }
+  const cur=loadPlan('U'), filled=cur.days.reduce((n,d)=>n+d.items.filter(x=>!x.hotel).length,0);
+  if(filled<=4||b.dataset.arm){ importShared(); return; }
+  b.dataset.arm='1'; b.classList.add('warn'); b.textContent='지금 "당신의 여정"을 덮어쓰게 돼요. 한 번 더 누르면 가져와요';
+});
+
 // ---- 사진·영상 (M3): 기기 안 IndexedDB에만 저장. 공유 링크·내보내기 파일에는 실리지 않는다 ----
 const MDB={db:null};
 function mdbOpen(){ return new Promise((res,rej)=>{ if(MDB.db) return res(MDB.db); if(!window.indexedDB) return rej(new Error("이 브라우저는 사진 저장을 지원하지 않아요")); const rq=indexedDB.open("tokki",1);
@@ -1732,7 +1839,7 @@ const media={ put:rec=>mdbTx('readwrite',st=>st.put(rec)), del:id=>mdbTx('readwr
 var MEDIA_IDX={}; // stopId -> [{id,kind,url(썸네일)}]
 function freeMediaIdx(){ Object.values(MEDIA_IDX).flat().forEach(m=>{ if(m.url) try{ URL.revokeObjectURL(m.url); }catch(e){} }); MEDIA_IDX={}; }
 async function loadMediaIndex(){ freeMediaIdx(); try{ const all=await media.byTrip(variant); (all||[]).sort((a,b)=>a.createdAt-b.createdAt).forEach(r=>{ (MEDIA_IDX[r.stopId]=MEDIA_IDX[r.stopId]||[]).push({id:r.id,kind:r.kind,url:r.thumb?URL.createObjectURL(r.thumb):null}); }); }catch(e){ MEDIA_IDX={}; } }
-function paintMedia(){ const IDX=(typeof MEDIA_IDX==='object'&&MEDIA_IDX)||{}; document.querySelectorAll('.media[data-stop]').forEach(el=>{ const list=IDX[el.dataset.stop]||[]; el.innerHTML=list.map(m=>`<button class="th ${m.kind==='video'?'v':''} ${m.url?'':'noimg'}" type="button" data-mid="${esc(m.id)}" aria-label="${m.kind==='video'?'영상':'사진'} 보기">${m.url?`<img src="${m.url}" alt="">`:(m.kind==='video'?'🎞':'🖼')}</button>`).join('')+`<button class="madd" type="button" aria-label="사진·영상 담기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>${list.length?'더 담기':'사진·영상 담기'}</button>`; }); }
+function paintMedia(){ const IDX=(typeof MEDIA_IDX==='object'&&MEDIA_IDX)||{}; const ro=variant==='S'; document.querySelectorAll('.media[data-stop]').forEach(el=>{ const list=IDX[el.dataset.stop]||[]; if(ro){ el.innerHTML=''; return; } el.innerHTML=list.map(m=>`<button class="th ${m.kind==='video'?'v':''} ${m.url?'':'noimg'}" type="button" data-mid="${esc(m.id)}" aria-label="${m.kind==='video'?'영상':'사진'} 보기">${m.url?`<img src="${m.url}" alt="">`:(m.kind==='video'?'🎞':'🖼')}</button>`).join('')+`<button class="madd" type="button" aria-label="사진·영상 담기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>${list.length?'더 담기':'사진·영상 담기'}</button>`; }); }
 function toast(t,ms){ const el=document.getElementById('toast'); el.textContent=t; el.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>{ el.hidden=true; },ms||3500); }
 async function shrinkImage(file,maxEdge,quality){
   let bmp=null; try{ bmp=await createImageBitmap(file,{imageOrientation:'from-image'}); }catch(e){ try{ bmp=await createImageBitmap(file); }catch(e2){ bmp=null; } }
@@ -1785,7 +1892,7 @@ document.getElementById('mvClose').onclick=closeMedia;
 document.getElementById('mvDel').onclick=()=>{ document.getElementById('mvDelConfirm').hidden=false; document.getElementById('mvDel').hidden=true; };
 document.getElementById('mvDelNo').onclick=()=>{ document.getElementById('mvDelConfirm').hidden=true; document.getElementById('mvDel').hidden=false; };
 document.getElementById('mvDelYes').onclick=async()=>{ if(!mvCur) return; try{ await media.del(mvCur.id); const list=MEDIA_IDX[mvCur.stopId]||[]; const k=list.findIndex(m=>m.id===mvCur.id); if(k>=0){ if(list[k].url) URL.revokeObjectURL(list[k].url); list.splice(k,1); } paintMedia(); closeMedia(); toast('지웠어요'); }catch(e){ toast('지우지 못했어요'); } };
-loadMediaIndex().then(paintMedia);
+if(SHARE_BOOT) openSharedFromHash().then(ok=>{ if(!ok) render(); }); else loadMediaIndex().then(paintMedia);
 
 // ---- 챙김 메모 시트 (M2c) ----
 const bridgesheet=document.getElementById('bridgesheet'); let bridgeDay=0;
@@ -1819,7 +1926,7 @@ document.getElementById('tripClose').onclick=closeTrip; document.getElementById(
 document.getElementById('tripform').onsubmit=e=>{ e.preventDefault(); const f=e.target; const a=parseYMD(f.querySelector('#tStart').value), b=parseYMD(f.querySelector('#tEnd').value); if(a&&b&&b<a){ updateDaysNote(); return; }
   snapshot(); const note=setTripFields({title:f.querySelector('#tTitle').value,start:f.querySelector('#tStart').value,end:f.querySelector('#tEnd').value,flight_in:f.querySelector('#tIn').value.trim(),flight_out:f.querySelector('#tOut').value.trim(),lodging_name:f.querySelector('#tLodge').value,lodging_area:f.querySelector('#tArea').value,party:f.querySelector('#tParty').value});
   save(); render(); closeTrip(); statusHint(note?`여행 정보를 저장했어요 · ${note}`:'여행 정보를 저장했어요'); };
-document.getElementById('status').addEventListener('click',()=>{ if(currentMeta().custom) openTrip(); else statusHint('추천 여정이에요. 아래 "이 여정을 바탕으로 직접 꾸미기"를 누르면 날짜·숙소를 적을 수 있어요'); });
+document.getElementById('status').addEventListener('click',()=>{ if(currentMeta().custom) openTrip(); else if(currentMeta().shared) statusHint('받은 여정이에요. "내 여정으로 가져오기"를 누르면 날짜·숙소를 고칠 수 있어요'); else statusHint('추천 여정이에요. 아래 "이 여정을 바탕으로 직접 꾸미기"를 누르면 날짜·숙소를 적을 수 있어요'); });
 document.getElementById('status').addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&currentMeta().custom){ e.preventDefault(); openTrip(); } });
 
 // ---- 여정 고르기 ----
@@ -1993,7 +2100,8 @@ function applyProfile(){
   if(typeof BACKEND!=="undefined"&&BACKEND) setFabLabel(askTo());
 }
 // 카카오톡 등 인앱 브라우저: 저장소가 Safari와 분리되므로 안내 (설계 1.1)
-(function(){ const ua=navigator.userAgent||""; const inapp=/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\//i.test(ua); const el=document.getElementById('inapp'); if(!el||!inapp) return;
+var INAPP=false;
+(function(){ const ua=navigator.userAgent||""; const inapp=/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\//i.test(ua); INAPP=inapp; const el=document.getElementById('inapp'); if(!el||!inapp) return;
   const ios=/iPhone|iPad|iPod/i.test(ua); const href=location.href;
   const open=ios?`kakaotalk://web/openExternal?url=${encodeURIComponent(href)}`:`intent://${href.replace(/^https?:\/\//,'')}#Intent;scheme=https;package=com.android.chrome;end`;
   el.innerHTML=`<span>앱 안에서 열렸어요. 여정이 저장되게 하려면 Safari나 Chrome으로 여세요.</span><a href="${open}" rel="noopener">브라우저로 열기</a>`; el.hidden=false; })();

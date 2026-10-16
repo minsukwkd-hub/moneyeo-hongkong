@@ -27,10 +27,11 @@
 - 커밋 메시지 끝에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 - 로컬 확인: `python -m http.server 8765 --directory .` 후 http://localhost:8765/index.html (file:// 로 열면 fetch·일부 기능 제한).
 
-## 진행 상태 (2026-10-14)
+## 진행 상태 (2026-10-16)
 - SUZI 프록시: **Cloudflare Worker 운영 중, 종단 검증 완료** https://suzi-proxy.suzi-proxy.workers.dev/ (계정 이메일 minsukwkd+cf@gmail.com). 시크릿은 `ANTHROPIC_API_KEY` 하나. **서버 토큰은 쓰지 않기로 결정**(Origin 제한·IP당 30회/분·월 한도로 방어). **실행 위치는 도쿄 고정(`[placement] region`)** — Anthropic이 홍콩(HKG) 발신을 403으로 막기 때문. 이 설정을 지우면 홍콩 현지에서 SUZI가 죽는다. Vercel 배포본(https://suzi-proxy.vercel.app/api/suzi, hnd1 고정)은 예비.
 - `SUZI_DEFAULT.url`은 Cloudflare 주소, `token`은 빈 값이 정상. 저장된 연결 설정은 사용자가 직접 바꾼 경우(`custom:true`)가 아니면 항상 `SUZI_DEFAULT`를 따른다.
-- 설계: `docs/설계.md`(v3, 개정 2)가 장기 구조·데이터 모델·착수 순서(M0~M4)의 기준. **M0·M1·M2 완료**(이름/토끼 호칭/인앱 띠 · 모델 v3+repo+SUZI id 도구 · 내보내기/불러오기 · 여행 정보 시트 · ▲▼ 순서/이동시간/부하 경고 · 직접 장소/챙김 메모). 다음은 M3(공유 링크·사진·방문 체크/메모/지출/일기·여행 목록). 템플릿 읽기 전용 전환은 테스트 피드백 뒤.
+- 설계: `docs/설계.md`(v3, 개정 2)가 장기 구조·데이터 모델·착수 순서(M0~M4)의 기준. **M0·M1·M2 완료**(이름/토끼 호칭/인앱 띠 · 모델 v3+repo+SUZI id 도구 · 내보내기/불러오기 · 여행 정보 시트 · ▲▼ 순서/이동시간/부하 경고 · 직접 장소/챙김 메모). **M3 진행 중**: 사진·영상(기기 저장)과 공유 링크 완료, 남은 것은 방문 체크/메모/지출/일기·여행 목록. 템플릿 읽기 전용 전환은 테스트 피드백 뒤.
+- 공유 링크(M3a): `toSlim`/`fromSlim`(슬림 포맷 v1) → deflate-raw → base64url → `#s=`(압축 불가 브라우저는 `#j=`). 받는 쪽은 부팅 때 해시를 풀어 "받은 여정"(variant `S`, `SHARED.meta`, 저장 안 함)으로 보여 주고 "내 여정으로 가져오기"로 `applyImport`. 1,800자 초과면 파일 내보내기로 전환. 주의: 스크립트 안 `history`는 되돌리기 스택이므로 브라우저 히스토리는 반드시 `window.history`로 부른다.
 - 저장 키: 여행 `tokki-trip:<U|A|B|C>`(옛 `suzi-hk-plan-v2:*`는 백업으로 남김), 설정 `tokki-settings-v1`, 대화 `tokki-chat-v1`, 정보 오버레이 `suzi-hk-info-v1`, 사용자 장소 `tokki-places-v1`, 사진·영상 IndexedDB `tokki/media`(기기 전용).
 - 설정 저장소: localStorage `tokki-settings-v1` `{v, profile:{name}}`. 이후 conn·last 등도 여기로 모은다(설계 2.10).
 
