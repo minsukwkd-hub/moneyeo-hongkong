@@ -8,6 +8,8 @@
 - `suzi-proxy/` — Cloudflare Worker 프록시(API 키 보관, Origin·토큰·IP당 10회/분 제한). `wrangler.toml` 포함. `npx wrangler deploy`.
 - `suzi-proxy-vercel/` — 같은 프록시의 Vercel Edge Function 버전(대안).
 - `deploy.ps1` — GitHub Pages 최초 배포 스크립트(이미 배포됨, 참고용).
+- `manifest.webmanifest`, `icons/` — 홈 화면 앱(PWA) 설정과 아이콘. 설치 안내 띠는 `paintInstall()`.
+- `data/places-hk.json`, `tools/build_places.py` — 장소 사전과 생성기.
 
 ## index.html 구조 (수정 시 참고)
 - 일정 데이터: `PLAN_A`(현재 여정) `PLAN_B`(조금 다른) `PLAN_C`(다른) `PLAN_U`(당신의 여정 = 직접 꾸미기 뼈대) → `PLANS` 배열. 저장: localStorage `suzi-hk-plan-v2:<id>`, 선택 여정 `suzi-hk-variant`.
