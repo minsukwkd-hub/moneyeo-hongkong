@@ -30,6 +30,11 @@
 - 커밋 메시지 끝에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 - 로컬 확인: `python -m http.server 8765 --directory .` 후 http://localhost:8765/index.html (file:// 로 열면 fetch·일부 기능 제한).
 
+## 보존 상태 (2026-11-02 · VER 1 봉인)
+- 홍콩 편 여행이 실제로 끝났고 좋은 피드백을 받았다. **이 저장소는 VER 1(홍콩)의 추억·기능·설정을 그대로 보존하는 곳**이다. 태그 `v1-hongkong`.
+- 새 여행지·새 사용자용 VER 2는 별도 저장소·별도 주소에서 진행한다. 이 저장소에서는 기능 변경을 하지 않고, 꼭 필요한 수정(배포 깨짐·보안)만 한다.
+- Worker(`suzi-proxy`)는 VER 1·VER 2가 공유한다. VER 2 주소를 `ALLOWED_ORIGIN`에 추가할 때 VER 1 주소를 빼지 않는다.
+
 ## 진행 상태 (2026-10-16 마감 · 작업기록 45번까지)
 - SUZI 프록시: **Cloudflare Worker 운영 중, 종단 검증 완료** https://suzi-proxy.suzi-proxy.workers.dev/ (계정 이메일 minsukwkd+cf@gmail.com). 시크릿은 `ANTHROPIC_API_KEY` 하나. **서버 토큰은 쓰지 않기로 결정**(Origin 제한·IP당 30회/분·월 한도로 방어). **실행 위치는 도쿄 고정(`[placement] region`)** — Anthropic이 홍콩(HKG) 발신을 403으로 막기 때문. 이 설정을 지우면 홍콩 현지에서 SUZI가 죽는다. Vercel 배포본(https://suzi-proxy.vercel.app/api/suzi, hnd1 고정)은 예비.
 - `SUZI_DEFAULT.url`은 Cloudflare 주소, `token`은 빈 값이 정상. 저장된 연결 설정은 사용자가 직접 바꾼 경우(`custom:true`)가 아니면 항상 `SUZI_DEFAULT`를 따른다.
